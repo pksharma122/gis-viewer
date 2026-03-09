@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>GIS VIEWER PRO v9.6.34</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://ppete2.github.io/Leaflet.PolylineMeasure/Leaflet.PolylineMeasure.css" />
+    <style>
+        body { margin:0; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; background: #f0f2f5; }
+        #panel { width: 380px; padding:15px; background:white; border-right: 1px solid #ccc; overflow-y: auto; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
+        #map { flex-grow: 1; height: 100vh; }
+        .section { margin-bottom: 12px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; }
+        .pro-gate { background: #fff4e5; border: 2px dashed #ff9800; text-align: center; padding: 15px; border-radius: 10px; }
+        button { width: 100%; padding: 10px; cursor: pointer; border-radius: 5px; border: none; background: #1a73e8; color: white; font-weight: 600; margin-top: 5px; }
+        input, select, textarea { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #bbb; border-radius: 5px; box-sizing: border-box; font-size: 13px; }
+        label { font-size: 11px; font-weight: bold; color: #444; display: block; margin-top: 8px; text-transform: uppercase; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="panel">
+    <div id="activationBox" class="pro-gate">
+        <h3>🔐 GIS PRO v9.6.34</h3>
+        <input type="text" id="passInput" placeholder="Enter License Key...">
+        <button id="activateBtn">Unlock All Tools</button>
+    </div>
+
+    <div id="mainTools" class="hidden">
+        <div class="section" style="border-left: 5px solid #4caf50;">
+            <h4 style="color: #2e7d32; margin:0;">✨ PRO EDITION ACTIVE</h4>
+        </div>
+
+        <div class="section">
+            <label>📂 Data Source</label>
+            <input type="file" id="fileInput" accept=".zip,.json,.geojson,.csv">
+        </div>
+
+        <div class="section">
+            <label>🔍 Spatial Search</label>
+            <select id="searchLayerSelect"><option value="">-- Choose Layer --</option></select>
+            <select id="searchFieldSelect"><option value="">-- Choose Field --</option></select>
+            <input type="text" id="searchInput" placeholder="Value...">
+            <button id="searchBtn">Search</button>
+        </div>
+
+        <div class="section">
+            <label>📏 Buffer Analysis</label>
+            <select id="bufLayerSelect"><option value="">-- Select Layer --</option></select>
+            <input type="number" id="bufDist" placeholder="Distance (m)">
+            <button id="bufferBtn">Apply Buffer</button>
+        </div>
+
+        <div class="section">
+            <label>✂️ Intersection</label>
+            <select id="intLayer1"><option value="">-- Layer 1 --</option></select>
+            <select id="intLayer2"><option value="">-- Layer 2 --</option></select>
+            <button id="intersectBtn">Find Overlap</button>
+        </div>
+
+        <div class="section">
+            <label>🌐 WKT Geometry</label>
+            <textarea id="wktInput" placeholder="POLYGON((...))" style="height: 50px;"></textarea>
+            <button id="wktBtn">Draw WKT</button>
+        </div>
+
+        <div id="layerList" class="section">Layers Control</div>
+    </div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+<script src="https://unpkg.com/wellknown/wellknown.js"></script>
+<script src="https://ppete2.github.io/Leaflet.PolylineMeasure/Leaflet.PolylineMeasure.js"></script>
+<script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyA8kH985yfWN83365hHa1s80gVPt3A2_aQ",
+        authDomain: "my-gis-tool.firebaseapp.com",
+        projectId: "my-gis-tool",
+        storageBucket: "my-gis-tool.firebasestorage.app",
+        messagingSenderId: "549190191655",
+        appId: "1:549190191655:web:e9f48907f0bb2b42c19c02"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    if(localStorage.getItem('isGisPro') === 'true') {
+        document.getElementById('activationBox').classList.add('hidden');
+        document.getElementById('mainTools').classList.remove('hidden');
+    }
+
+    document.getElementById('activateBtn').onclick = async () => {
+        const key = document.getElementById('passInput').value.trim();
+        const q = query(collection(db, "keys"), where("key_code", "==", key), where("status", "==", "active"));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+            localStorage.setItem('isGisPro', 'true');
+            location.reload();
+        } else { alert("Key Invalid!"); }
+    };
+</script>
+
+<script>
+    var map = L.map('map', { zoomControl: false }).setView([22, 78], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    L.control.polylineMeasure({ position: 'topright' }).addTo(map);
+
+    // --- PASTE YOUR _0x CODE HERE (The one with executeSearch function) ---
+</script>
+</body>
+</html>
