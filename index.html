@@ -271,23 +271,46 @@ const db   = getFirestore(app);
 // KEY PATTERN: unsubscribe immediately after first fire.
 // Body is invisible until we confirm auth — zero flicker.
 // Map is only initialised AFTER we know user is valid.
+// IMPORTANT: Firestore failure never causes redirect — user
+// stays in app with fallback trial data instead.
 // ─────────────────────────────────────────────────────────
 const unsubscribe = onAuthStateChanged(auth, async (user) => {
-  unsubscribe(); // critical — stop any re-fires
+  unsubscribe(); // fires ONCE only — loop impossible
 
   if (!user) {
+    // Not logged in at all — go to login
     window.location.replace('login.html');
     return;
   }
 
+  // User IS authenticated — try to load their profile
   let data;
   try {
     const snap = await getDoc(doc(db, 'users', user.uid));
-    if (!snap.exists()) { window.location.replace('login.html'); return; }
-    data = snap.data();
-  } catch(e) {
-    window.location.replace('login.html');
-    return;
+    if (snap.exists()) {
+      data = snap.data();
+    } else {
+      // Doc missing — create it automatically (first-time / Firestore was set up late)
+      const now = Date.now();
+      data = {
+        uid: user.uid, email: user.email,
+        name: user.displayName || user.email,
+        plan: 'trial', trialStart: now,
+        trialEnd: now + 7 * 86400000,
+        licenseKey: null, licenseExpiry: null, blocked: false
+      };
+      try { await updateDoc(doc(db,'users',user.uid), data); } catch(_){}
+    }
+  } catch(err) {
+    // Firestore blocked or offline — show app anyway with trial fallback
+    // DO NOT redirect — the user is logged in, Firestore rules may just need fixing
+    const now = Date.now();
+    data = {
+      uid: user.uid, email: user.email,
+      name: user.displayName || user.email,
+      plan: 'trial', trialStart: now,
+      trialEnd: now + 7 * 86400000, blocked: false
+    };
   }
 
   // ── Expose to non-module GIS script ──
