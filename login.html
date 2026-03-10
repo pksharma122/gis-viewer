@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GIS Viewer — Login</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 40%, #0d3b6e 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .card {
+      background: white; border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+      width: 420px; padding: 40px 36px;
+      animation: slideUp 0.4s ease;
+    }
+    @keyframes slideUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
+    .logo { text-align:center; margin-bottom: 28px; }
+    .logo h1 { font-size: 28px; color: #1b5e20; font-weight: 800; letter-spacing: -0.5px; }
+    .logo p  { color: #666; font-size: 13px; margin-top: 4px; }
+    .tabs { display:flex; border-radius: 8px; overflow:hidden; border: 1px solid #ddd; margin-bottom: 24px; }
+    .tab {
+      flex:1; padding: 10px; text-align:center; cursor:pointer;
+      font-weight: 600; font-size: 14px; background: #f5f5f5; color: #777;
+      transition: all 0.2s;
+    }
+    .tab.active { background: #1b5e20; color: white; }
+    .form-group { margin-bottom: 16px; }
+    label { display:block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+    input[type=text], input[type=email], input[type=password] {
+      width:100%; padding: 11px 14px; border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 14px; outline: none; transition: border 0.2s;
+    }
+    input:focus { border-color: #2e7d32; }
+    .btn-main {
+      width:100%; padding: 13px; background: #2e7d32; color:white;
+      border:none; border-radius: 8px; font-size: 15px; font-weight: 700;
+      cursor:pointer; margin-top: 4px; transition: background 0.2s;
+    }
+    .btn-main:hover { background: #1b5e20; }
+    .btn-main:disabled { background: #aaa; cursor: not-allowed; }
+    .msg { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 14px; display:none; }
+    .msg.error   { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+    .msg.success { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
+    .divider { text-align:center; color: #bbb; font-size: 12px; margin: 18px 0; position:relative; }
+    .divider::before, .divider::after { content:''; position:absolute; top:50%; width:40%; height:1px; background:#eee; }
+    .divider::before { left:0; } .divider::after { right:0; }
+    .features { background: #f1f8e9; border-radius: 10px; padding: 16px; margin-top: 20px; }
+    .features h4 { color: #33691e; font-size: 13px; margin-bottom: 10px; }
+    .feat-row { display:flex; align-items:center; gap:8px; font-size: 12px; color: #555; margin-bottom: 6px; }
+    .feat-row span.icon { font-size: 16px; }
+    .spinner { display:inline-block; width:16px; height:16px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.6s linear infinite; vertical-align:middle; margin-right:6px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .forgot { text-align:right; margin-top: -10px; margin-bottom: 14px; }
+    .forgot a { font-size: 12px; color: #2e7d32; text-decoration: none; }
+    .forgot a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <h1>🌍 GIS Viewer</h1>
+    <p>Professional Geospatial Analysis Platform</p>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tabLogin" onclick="switchTab('login')">Login</div>
+    <div class="tab" id="tabSignup" onclick="switchTab('signup')">Create Account</div>
+  </div>
+
+  <!-- LOGIN FORM -->
+  <div id="formLogin">
+    <div class="form-group">
+      <label>Email Address</label>
+      <input type="email" id="loginEmail" placeholder="you@example.com" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()" />
+    </div>
+    <div class="forgot"><a href="#" onclick="doForgot()">Forgot password?</a></div>
+    <button class="btn-main" id="btnLogin" onclick="doLogin()">Login to GIS Viewer</button>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+
+  <!-- SIGNUP FORM -->
+  <div id="formSignup" style="display:none;">
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" id="signupName" placeholder="Your Name" />
+    </div>
+    <div class="form-group">
+      <label>Email Address</label>
+      <input type="email" id="signupEmail" placeholder="you@example.com" />
+    </div>
+    <div class="form-group">
+      <label>Password (min 6 characters)</label>
+      <input type="password" id="signupPassword" placeholder="••••••••" />
+    </div>
+    <button class="btn-main" id="btnSignup" onclick="doSignup()">Create Account & Start Free Trial</button>
+    <div class="msg" id="signupMsg"></div>
+  </div>
+
+  <div class="features">
+    <h4>✨ Your 7-Day Free Trial Includes:</h4>
+    <div class="feat-row"><span class="icon">✂️</span> Spatial Intersect Analysis</div>
+    <div class="feat-row"><span class="icon">🛡️</span> Buffer Zone Generation</div>
+    <div class="feat-row"><span class="icon">🎨</span> Advanced Symbology</div>
+    <div class="feat-row"><span class="icon">📥</span> Export to KML, CSV, GeoJSON</div>
+    <div class="feat-row"><span class="icon">🗺️</span> Load Shapefile, GeoJSON, KML</div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+           sendPasswordResetEmail, updateProfile, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  // ════════════════════════════════════════════════════
+  // 🔧 REPLACE with your Firebase project config
+  //    Go to: Firebase Console → Project Settings → Your Apps → Web App
+  // ════════════════════════════════════════════════════
+  const firebaseConfig = {
+    apiKey:            "AIzaSyAnZVNM5Mov6fRJ_yVhQE42X58xw_RPEUs",
+    authDomain:        "gis-viewer-app.firebaseapp.com",
+    projectId:         "gis-viewer-app",
+    storageBucket:     "gis-viewer-app.firebasestorage.app",
+    messagingSenderId: "696344287586",
+    appId:             "1:696344287586:web:97ac3942fd3d054d78743b"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  const TRIAL_DAYS = 7;
+
+  // ── If user is already logged in, redirect straight to app ──
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      const status = await getUserStatus(user.uid);
+      if (status.blocked) {
+        showMsg('loginMsg', 'error', 'Your account has been suspended. Contact support.');
+        await auth.signOut();
+        return;
+      }
+      window.location.href = 'index.html';
+    }
+  });
+
+  // ── Helpers ──
+  function showMsg(id, type, text) {
+    const el = document.getElementById(id);
+    el.className = 'msg ' + type;
+    el.innerHTML = text;
+    el.style.display = 'block';
+  }
+  function setLoading(btnId, loading, defaultText) {
+    const btn = document.getElementById(btnId);
+    btn.disabled = loading;
+    btn.innerHTML = loading ? `<span class="spinner"></span> Please wait...` : defaultText;
+  }
+
+  async function getUserStatus(uid) {
+    try {
+      const snap = await getDoc(doc(db, 'users', uid));
+      return snap.exists() ? snap.data() : {};
+    } catch { return {}; }
+  }
+
+  // ── Create new user record in Firestore ──
+  async function createUserRecord(uid, email, name) {
+    const now     = Date.now();
+    const trialEnd = now + TRIAL_DAYS * 24 * 60 * 60 * 1000;
+    await setDoc(doc(db, 'users', uid), {
+      uid, email, name,
+      plan:       'trial',          // trial | monthly | yearly | lifetime
+      trialStart: now,
+      trialEnd:   trialEnd,
+      licenseKey: null,
+      licenseExpiry: null,
+      blocked:    false,
+      createdAt:  serverTimestamp()
+    });
+  }
+
+  // ── Signup ──
+  window.doSignup = async function () {
+    const name  = document.getElementById('signupName').value.trim();
+    const email = document.getElementById('signupEmail').value.trim();
+    const pass  = document.getElementById('signupPassword').value;
+    if (!name)          return showMsg('signupMsg','error','Please enter your name.');
+    if (!email)         return showMsg('signupMsg','error','Please enter your email.');
+    if (pass.length < 6) return showMsg('signupMsg','error','Password must be at least 6 characters.');
+
+    setLoading('btnSignup', true, '');
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      await updateProfile(cred.user, { displayName: name });
+      await createUserRecord(cred.user.uid, email, name);
+      showMsg('signupMsg','success','✅ Account created! Starting your 7-day trial...');
+      setTimeout(() => { window.location.href = 'index.html'; }, 1200);
+    } catch (e) {
+      const msgs = {
+        'auth/email-already-in-use': 'This email is already registered. Please login.',
+        'auth/invalid-email':        'Please enter a valid email address.',
+        'auth/weak-password':        'Password is too weak. Use at least 6 characters.'
+      };
+      showMsg('signupMsg','error', msgs[e.code] || e.message);
+      setLoading('btnSignup', false, 'Create Account & Start Free Trial');
+    }
+  };
+
+  // ── Login ──
+  window.doLogin = async function () {
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass  = document.getElementById('loginPassword').value;
+    if (!email || !pass) return showMsg('loginMsg','error','Please enter email and password.');
+
+    setLoading('btnLogin', true, '');
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+      showMsg('loginMsg','success','✅ Login successful! Loading GIS Viewer...');
+      // onAuthStateChanged above will redirect
+    } catch (e) {
+      const msgs = {
+        'auth/user-not-found':   'No account found with this email.',
+        'auth/wrong-password':   'Incorrect password.',
+        'auth/invalid-email':    'Please enter a valid email address.',
+        'auth/too-many-requests':'Too many attempts. Try again later.'
+      };
+      showMsg('loginMsg','error', msgs[e.code] || 'Login failed: ' + e.message);
+      setLoading('btnLogin', false, 'Login to GIS Viewer');
+    }
+  };
+
+  // ── Forgot password ──
+  window.doForgot = async function () {
+    const email = document.getElementById('loginEmail').value.trim();
+    if (!email) return showMsg('loginMsg','error','Enter your email above first.');
+    try {
+      await sendPasswordResetEmail(auth, email);
+      showMsg('loginMsg','success','📧 Password reset email sent! Check your inbox.');
+    } catch {
+      showMsg('loginMsg','error','Could not send reset email. Check the address and try again.');
+    }
+  };
+</script>
+
+<script>
+  function switchTab(tab) {
+    document.getElementById('formLogin').style.display  = tab === 'login'  ? 'block' : 'none';
+    document.getElementById('formSignup').style.display = tab === 'signup' ? 'block' : 'none';
+    document.getElementById('tabLogin').className  = 'tab' + (tab === 'login'  ? ' active' : '');
+    document.getElementById('tabSignup').className = 'tab' + (tab === 'signup' ? ' active' : '');
+  }
+</script>
+</body>
+</html>
