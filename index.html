@@ -1,23 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>GIS Viewer Pro</title>
   <meta charset="utf-8"/>
+  <title>GIS Viewer Pro</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://ppete2.github.io/Leaflet.PolylineMeasure/Leaflet.PolylineMeasure.css"/>
   <style>
     *{box-sizing:border-box;}
-
-    /* ── Page invisible until auth confirmed ── */
-    body{
-      visibility:hidden;
-      margin:0;font-family:'Segoe UI',sans-serif;
-      display:flex;height:100vh;background:#f0f2f5;overflow:hidden;
-    }
-    body.ready{ visibility:visible; }
-
-    #panel{width:380px;padding:15px;background:white;border-right:1px solid #ddd;overflow-y:auto;z-index:1000;height:100vh;flex-shrink:0;}
-    #map{flex-grow:1;height:100vh;}
+    body{margin:0;font-family:'Segoe UI',sans-serif;display:flex;height:100vh;background:#f0f2f5;overflow:hidden;}
+    #panel{width:380px;padding:15px;background:white;border-right:1px solid #ddd;overflow-y:auto;height:100vh;flex-shrink:0;display:none;}
+    #map{flex-grow:1;height:100vh;display:none;}
+    #loader{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#1b5e20,#2e7d32 50%,#0d3b6e);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;}
+    #loader .ring{width:52px;height:52px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;}
+    #loader p{color:#fff;margin-top:18px;font-size:16px;font-weight:700;}
+    #loader small{color:rgba(255,255,255,.7);font-size:12px;margin-top:6px;}
+    @keyframes spin{to{transform:rotate(360deg)}}
 
     .section{margin-bottom:12px;padding:12px;border:1px solid #eee;border-radius:8px;}
     .stats-card{background:#1b5e20;color:white;padding:15px;border-radius:8px;margin-bottom:10px;}
@@ -28,48 +25,41 @@
     .popup-table{width:100%;border-collapse:collapse;}
     .popup-table td{padding:4px 8px;border:1px solid #999;font-size:13px;color:#333;word-break:break-all;}
     .popup-table tr td:first-child{width:40%;color:#555;}
-    input,select,textarea{width:100%;padding:8px;margin-top:5px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;font-size:13px;}
+    input,select,textarea{width:100%;padding:8px;margin-top:5px;border:1px solid #ccc;border-radius:4px;font-size:13px;}
     button.main-btn{width:100%;padding:10px;background:#43a047;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:600;margin-top:5px;}
     details summary{cursor:pointer;font-weight:bold;padding:5px 0;color:#2e7d32;}
-    .locked-feature{opacity:0.5;pointer-events:none;}
-    .pro-badge{color:#ffd700;font-size:10px;background:#333;padding:2px 4px;border-radius:3px;margin-left:5px;}
-    .legend{padding:10px;background:white;line-height:18px;color:#333;border-radius:5px;box-shadow:0 0 15px rgba(0,0,0,0.2);max-height:200px;overflow-y:auto;}
+    .locked-feature{opacity:.5;pointer-events:none;}
+    .legend{padding:10px;background:white;line-height:18px;color:#333;border-radius:5px;box-shadow:0 0 15px rgba(0,0,0,.2);max-height:200px;overflow-y:auto;}
     .legend i{width:15px;height:15px;float:left;margin-right:8px;border:1px solid #999;}
     .layer-item{padding:10px;border-bottom:1px solid #eee;}
     .layer-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
     .layer-title{font-weight:600;font-size:13px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;}
     .export-dropdown{position:relative;display:inline-block;}
-    .export-content{display:none;position:absolute;right:0;background:white;min-width:130px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:2000;border-radius:4px;border:1px solid #ddd;}
+    .export-content{display:none;position:absolute;right:0;background:white;min-width:130px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:2000;border-radius:4px;border:1px solid #ddd;}
     .export-dropdown:hover .export-content{display:block;}
     .export-content button{width:100%;padding:8px 12px;text-align:left;border:none;background:none;cursor:pointer;font-size:12px;}
     .export-content button:hover{background:#f5f5f5;}
     .action-icon{cursor:pointer;background:#f0f0f0;border:1px solid #ccc;border-radius:3px;padding:2px 6px;font-size:14px;}
     .sub-tool{margin:10px 0;padding-left:10px;border-left:2px solid #eee;}
-
-    /* User bar */
     #userBar{display:flex;align-items:center;justify-content:space-between;background:#e8f5e9;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;}
-    #userBar .uname{font-weight:700;color:#1b5e20;}
+    .uname{font-weight:700;color:#1b5e20;}
     .plan-badge{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;}
     .badge-trial{background:#fff3e0;color:#e65100;}
     .badge-monthly{background:#e3f2fd;color:#0d47a1;}
     .badge-yearly{background:#f3e5f5;color:#4a148c;}
     .badge-lifetime{background:#ffd700;color:#333;}
     .logout-btn{font-size:11px;color:#c62828;cursor:pointer;background:none;border:1px solid #ef9a9a;border-radius:4px;padding:2px 6px;}
-
-    /* Status banner */
     #statusBanner{padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px;line-height:1.5;}
     .banner-trial{background:#fff8e1;color:#e65100;border:1px solid #ffcc02;}
     .banner-expired{background:#ffebee;color:#c62828;border:1px solid #ef9a9a;}
     .banner-pro{background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7;}
-
-    /* Purchase modal */
-    .overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:3000;align-items:center;justify-content:center;}
+    .overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:3000;align-items:center;justify-content:center;}
     .overlay.show{display:flex;}
-    .modal{background:white;border-radius:16px;padding:32px 28px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.4);}
+    .modal{background:white;border-radius:16px;padding:32px 28px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4);}
     .modal h2{margin-bottom:6px;color:#1b5e20;font-size:20px;}
     .modal .sub{color:#666;font-size:13px;margin-bottom:22px;}
     .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px;}
-    .plan-card{border:2px solid #eee;border-radius:10px;padding:16px 12px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;}
+    .plan-card{border:2px solid #eee;border-radius:10px;padding:16px 12px;text-align:center;cursor:pointer;position:relative;}
     .plan-card:hover{border-color:#2e7d32;}
     .plan-card.selected{border-color:#2e7d32;background:#f1f8e9;}
     .plan-card .price{font-size:22px;font-weight:800;color:#1b5e20;}
@@ -79,404 +69,316 @@
     .qr-box{text-align:center;background:#f9f9f9;border-radius:10px;padding:20px;margin-bottom:18px;}
     .qr-box img{width:180px;height:180px;border:1px solid #ddd;border-radius:8px;}
     .qr-box p{font-size:13px;color:#555;margin-top:10px;}
-    .license-section{border-top:1px solid #eee;padding-top:18px;}
-    .license-section h4{font-size:14px;color:#333;margin-bottom:10px;}
-    .license-row{display:flex;gap:8px;}
-    .license-row input{margin-top:0;flex:1;}
-    .license-row button{padding:8px 16px;background:#1b5e20;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:600;white-space:nowrap;}
-    .msg-inline{font-size:12px;margin-top:8px;padding:6px 10px;border-radius:6px;display:none;}
-    .msg-inline.error{background:#ffebee;color:#c62828;}
-    .msg-inline.success{background:#e8f5e9;color:#1b5e20;}
+    .lic-sec{border-top:1px solid #eee;padding-top:18px;}
+    .lic-sec h4{font-size:14px;color:#333;margin-bottom:10px;}
+    .lic-row{display:flex;gap:8px;}
+    .lic-row input{margin-top:0;flex:1;}
+    .lic-row button{padding:8px 16px;background:#1b5e20;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:600;white-space:nowrap;}
+    .mi{font-size:12px;margin-top:8px;padding:6px 10px;border-radius:6px;display:none;}
+    .mi.error{background:#ffebee;color:#c62828;}
+    .mi.success{background:#e8f5e9;color:#1b5e20;}
     .close-btn{float:right;background:none;border:1px solid #ddd;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;color:#666;}
-
-    /* Expired lockout */
-    #expiredOverlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:4000;align-items:center;justify-content:center;}
-    #expiredOverlay.show{display:flex;}
-    .exp-card{background:white;border-radius:16px;padding:40px 36px;text-align:center;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.4);}
+    #expOv{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.75);z-index:4000;align-items:center;justify-content:center;}
+    #expOv.show{display:flex;}
+    .exp-card{background:white;border-radius:16px;padding:40px 36px;text-align:center;max-width:420px;width:90%;}
     .exp-card h2{color:#c62828;margin-bottom:10px;}
     .exp-card p{color:#555;font-size:14px;margin-bottom:24px;}
     .exp-card button{padding:12px 28px;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin:4px;}
-    .btn-upgrade{background:#2e7d32;color:white;}
-    .btn-logout{background:#eee;color:#333;}
+    .btn-up{background:#2e7d32;color:white;}
+    .btn-lo{background:#eee;color:#333;}
   </style>
 </head>
 <body>
 
+<!-- Loader shown first, always -->
+<div id="loader">
+  <div class="ring"></div>
+  <p>🌍 GIS Viewer Pro</p>
+  <small>Verifying your session...</small>
+</div>
+
 <div id="panel">
   <div id="userBar">
-    <div>
-      <div class="uname" id="displayName">...</div>
-      <div style="color:#555;font-size:11px;" id="userEmail"></div>
-    </div>
-    <span class="plan-badge badge-trial" id="planBadge">...</span>
+    <div><div class="uname" id="uName">...</div><div style="color:#555;font-size:11px" id="uEmail"></div></div>
+    <span class="plan-badge badge-trial" id="uBadge">...</span>
     <button class="logout-btn" onclick="doLogout()">Logout</button>
   </div>
-
   <div id="statusBanner" class="banner-trial">...</div>
-
   <h3 style="margin:0 0 10px;color:#1b5e20;font-size:16px;">🌍 GIS Viewer</h3>
-
   <div class="stats-card">
     <div class="stat-row">Visible Features:<span id="featCount" class="stat-val">0</span></div>
     <div class="stat-row">Total Area:<span id="totalArea" class="stat-val">0</span> m²</div>
     <div class="stat-row">Total Length:<span id="totalLength" class="stat-val">0</span> km</div>
   </div>
-
-  <div class="section">
-    <b>📂 Load Data</b>
-    <input type="file" id="fileInput" accept=".geojson,.json,.csv,.kml,.zip">
-  </div>
-
+  <div class="section"><b>📂 Load Data</b><input type="file" id="fileInput" accept=".geojson,.json,.csv,.kml,.zip"></div>
   <div class="section"><b>Layer Manager</b><div id="layerList"></div></div>
-
   <details class="section" open>
     <summary>🛠️ Tools</summary>
     <div class="sub-tool pro-gate">
-      <details open>
-        <summary>✂️ Spatial Intersect</summary>
+      <details open><summary>✂️ Spatial Intersect</summary>
         <select id="intLayer1"><option value="">-- Layer 1 --</option></select>
         <select id="intLayer2"><option value="">-- Layer 2 --</option></select>
-        <button class="main-btn" onclick="runAdvancedIntersection()" style="background:#00796b;">Generate Intersect</button>
+        <button class="main-btn" onclick="runIntersect()" style="background:#00796b">Generate Intersect</button>
       </details>
     </div>
     <div class="sub-tool pro-gate">
-      <details>
-        <summary>🛡️ Buffer Tool</summary>
-        <select id="bufLayerSelect"><option value="">-- Choose Layer --</option></select>
+      <details><summary>🛡️ Buffer Tool</summary>
+        <select id="bufLayer"><option value="">-- Choose Layer --</option></select>
         <input type="number" id="bufDist" placeholder="Distance" step="0.1" value="0.5">
         <select id="bufUnit"><option value="kilometers">KM</option><option value="meters">Meters</option></select>
-        <button class="main-btn" onclick="runBuffer()" style="background:#673ab7;">Generate Buffer</button>
+        <button class="main-btn" onclick="runBuffer()" style="background:#673ab7">Generate Buffer</button>
       </details>
     </div>
     <div class="sub-tool pro-gate">
-      <details>
-        <summary>🎨 Symbology</summary>
-        <select id="symLayerSelect" onchange="updateSymFields()"></select>
-        <select id="symFieldSelect" onchange="applySymbology()"></select>
+      <details><summary>🎨 Symbology</summary>
+        <select id="symLayer" onchange="updateSymFields()"></select>
+        <select id="symField" onchange="applySymbology()"></select>
       </details>
     </div>
   </details>
-
   <details class="section">
     <summary>🔍 Search</summary>
-    <select id="searchLayerSelect" onchange="updateSearchFields()"></select>
-    <select id="searchFieldSelect"></select>
-    <input id="searchInput" placeholder="Exact Value...">
-    <button class="main-btn" onclick="performTargetedSearch()" style="background:#fb8c00;">Search</button>
+    <select id="searchLayer" onchange="updateSearchFields()"></select>
+    <select id="searchField"></select>
+    <input id="searchVal" placeholder="Exact Value...">
+    <button class="main-btn" onclick="doSearch()" style="background:#fb8c00">Search</button>
   </details>
-
   <div class="section">
-    <b>📍 Manual Info</b>
-    <div style="display:flex;gap:5px;"><input id="lat" placeholder="Lat"><input id="lon" placeholder="Lon"></div>
-    <button class="main-btn" onclick="showPoint()" style="background:#1565c0;">Drop Point</button>
-    <textarea id="wkt" rows="2" placeholder="Paste WKT here..." style="margin-top:10px;"></textarea>
-    <button class="main-btn" onclick="drawWKT()" style="background:#1565c0;">Render WKT</button>
+    <b>📍 Manual</b>
+    <div style="display:flex;gap:5px"><input id="lat" placeholder="Lat"><input id="lon" placeholder="Lon"></div>
+    <button class="main-btn" onclick="dropPoint()" style="background:#1565c0">Drop Point</button>
+    <textarea id="wkt" rows="2" placeholder="Paste WKT..." style="margin-top:10px"></textarea>
+    <button class="main-btn" onclick="drawWKT()" style="background:#1565c0">Render WKT</button>
   </div>
-
-  <button class="main-btn" id="upgradeBtn" onclick="showPurchaseModal()" style="background:#ff9800;margin-top:5px;">💎 Upgrade to Pro</button>
-  <button class="main-btn" onclick="location.reload()" style="background:#d32f2f;margin-top:8px;">Reset System</button>
+  <button class="main-btn" id="upgBtn" onclick="showModal()" style="background:#ff9800;margin-top:5px">💎 Upgrade to Pro</button>
+  <button class="main-btn" onclick="location.reload()" style="background:#d32f2f;margin-top:8px">Reset</button>
 </div>
 
 <!-- Purchase Modal -->
-<div class="overlay" id="purchaseOverlay">
+<div class="overlay" id="purOv">
   <div class="modal">
-    <button class="close-btn" onclick="hidePurchaseModal()">✕ Close</button>
-    <h2>💎 Upgrade to Pro</h2>
-    <p class="sub">Choose your plan — unlimited access, no restrictions</p>
+    <button class="close-btn" onclick="hideModal()">✕ Close</button>
+    <h2>💎 Upgrade to Pro</h2><p class="sub">Choose your plan</p>
     <div class="plans">
-      <div class="plan-card" id="planMonthly" onclick="selectPlan('monthly')">
-        <div class="plabel">Monthly</div>
-        <div class="price">₹499</div>
-        <div class="period">per month</div>
-      </div>
-      <div class="plan-card selected" id="planYearly" onclick="selectPlan('yearly')">
-        <div class="best">🔥 Best Value</div>
-        <div class="plabel">Yearly</div>
-        <div class="price">₹3,999</div>
-        <div class="period">per year</div>
-      </div>
-      <div class="plan-card" id="planLifetime" onclick="selectPlan('lifetime')">
-        <div class="plabel">Lifetime</div>
-        <div class="price">₹9,999</div>
-        <div class="period">one-time</div>
-      </div>
+      <div class="plan-card" id="pM" onclick="selPlan('monthly')"><div class="plabel">Monthly</div><div class="price">₹499</div><div class="period">per month</div></div>
+      <div class="plan-card selected" id="pY" onclick="selPlan('yearly')"><div class="best">🔥 Best Value</div><div class="plabel">Yearly</div><div class="price">₹3,999</div><div class="period">per year</div></div>
+      <div class="plan-card" id="pL" onclick="selPlan('lifetime')"><div class="plabel">Lifetime</div><div class="price">₹9,999</div><div class="period">one-time</div></div>
     </div>
     <div class="qr-box">
-      <img src="YOUR_QR_IMAGE_LINK_HERE" alt="Payment QR"/>
-      <p>Scan with any UPI app<br>
-        <strong>+91-8384886164</strong><br>
-        <span style="font-size:11px;color:#888;">After payment, WhatsApp your screenshot + registered email to get your license key</span>
-      </p>
+      <img src="YOUR_QR_IMAGE_LINK_HERE" alt="QR"/>
+      <p>Scan with any UPI app<br><strong>+91-8384886164</strong><br><span style="font-size:11px;color:#888">WhatsApp screenshot + email after payment</span></p>
     </div>
-    <div class="license-section">
-      <h4>🔑 Already have a license key?</h4>
-      <div class="license-row">
-        <input type="text" id="licenseKeyInput" placeholder="Enter your license key..."/>
-        <button onclick="applyLicenseKey()">Activate</button>
-      </div>
-      <div class="msg-inline" id="licenseMsg"></div>
+    <div class="lic-sec">
+      <h4>🔑 Have a license key?</h4>
+      <div class="lic-row"><input type="text" id="licInput" placeholder="Enter license key..."/><button onclick="activateLic()">Activate</button></div>
+      <div class="mi" id="licMsg"></div>
     </div>
   </div>
 </div>
 
-<!-- Expired Lockout -->
-<div id="expiredOverlay">
+<!-- Expired overlay -->
+<div id="expOv">
   <div class="exp-card">
-    <div style="font-size:52px;margin-bottom:12px;">⏰</div>
-    <h2>Trial Expired</h2>
-    <p>Your 7-day free trial has ended.<br>Upgrade to continue using GIS Viewer Pro.</p>
-    <button class="btn-upgrade" onclick="document.getElementById('expiredOverlay').classList.remove('show');showPurchaseModal()">💎 View Plans &amp; Upgrade</button>
-    <button class="btn-logout" onclick="doLogout()">Logout</button>
+    <div style="font-size:52px;margin-bottom:12px">⏰</div>
+    <h2>Trial Expired</h2><p>Your 7-day free trial has ended.<br>Upgrade to continue.</p>
+    <button class="btn-up" onclick="document.getElementById('expOv').classList.remove('show');showModal()">💎 Upgrade Now</button>
+    <button class="btn-lo" onclick="doLogout()">Logout</button>
   </div>
 </div>
 
 <div id="map"></div>
 
-<!-- External Libraries -->
+<!-- ================================================================
+     SCRIPT ORDER (critical):
+     1. Firebase compat scripts
+     2. GIS library scripts
+     3. App code
+     ================================================================ -->
+
+<!-- 1. Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<!-- 2. GIS Libraries -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
 <script src="https://unpkg.com/wellknown/wellknown.js"></script>
-<script src="https://api.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.3.1/leaflet-omnivore.min.js"></script>
 <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
 <script src="https://ppete2.github.io/Leaflet.PolylineMeasure/Leaflet.PolylineMeasure.js"></script>
 
-<!-- Firebase (module) -->
-<script type="module">
-import { initializeApp }  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, updateDoc }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey:            "AIzaSyAnZVNM5Mov6fRJ_yVhQE42X58xw_RPEUs",
-  authDomain:        "gis-viewer-app.firebaseapp.com",
-  projectId:         "gis-viewer-app",
-  storageBucket:     "gis-viewer-app.firebasestorage.app",
-  messagingSenderId: "696344287586",
-  appId:             "1:696344287586:web:97ac3942fd3d054d78743b"
+<!-- 3. App Code -->
+<script>
+// ── Firebase init ──
+var _cfg = {
+  apiKey:"AIzaSyAnZVNM5Mov6fRJ_yVhQE42X58xw_RPEUs",
+  authDomain:"gis-viewer-app.firebaseapp.com",
+  projectId:"gis-viewer-app",
+  storageBucket:"gis-viewer-app.firebasestorage.app",
+  messagingSenderId:"696344287586",
+  appId:"1:696344287586:web:97ac3942fd3d054d78743b"
 };
+firebase.initializeApp(_cfg);
+var auth = firebase.auth();
+var db   = firebase.firestore();
+var PLAN_MS = {monthly:30*86400000, yearly:365*86400000, lifetime:36500*86400000};
 
-const PLAN_MS = {
-  monthly:  30  * 86400000,
-  yearly:   365 * 86400000,
-  lifetime: 36500 * 86400000
-};
+// ── GIS state ──
+var map, legend, layersStore = {}, selFeature = null, _isPro = false;
 
-const app  = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db   = getFirestore(app);
+// ────────────────────────────────────────────────────────────────
+// AUTH — one-time check, never loops, always boots app on success
+// ────────────────────────────────────────────────────────────────
+var _authDone = false;
+var _authTimer = setTimeout(function(){
+  if(!_authDone){ window.location.replace('login.html'); }
+}, 8000);
 
-// ─────────────────────────────────────────────────────────
-// KEY PATTERN: unsubscribe immediately after first fire.
-// Body is invisible until we confirm auth — zero flicker.
-// Map is only initialised AFTER we know user is valid.
-// IMPORTANT: Firestore failure never causes redirect — user
-// stays in app with fallback trial data instead.
-// ─────────────────────────────────────────────────────────
-const unsubscribe = onAuthStateChanged(auth, async (user) => {
-  unsubscribe(); // fires ONCE only — loop impossible
+var _unsub = auth.onAuthStateChanged(function(user){
+  _authDone = true;
+  clearTimeout(_authTimer);
+  _unsub();
 
-  if (!user) {
-    // Not logged in at all — go to login
-    window.location.replace('login.html');
-    return;
-  }
+  if(!user){ window.location.replace('login.html'); return; }
 
-  // User IS authenticated — try to load their profile
-  let data;
-  try {
-    const snap = await getDoc(doc(db, 'users', user.uid));
-    if (snap.exists()) {
-      data = snap.data();
-    } else {
-      // Doc missing — create it automatically (first-time / Firestore was set up late)
-      const now = Date.now();
-      data = {
-        uid: user.uid, email: user.email,
-        name: user.displayName || user.email,
-        plan: 'trial', trialStart: now,
-        trialEnd: now + 7 * 86400000,
-        licenseKey: null, licenseExpiry: null, blocked: false
-      };
-      try { await updateDoc(doc(db,'users',user.uid), data); } catch(_){}
-    }
-  } catch(err) {
-    // Firestore blocked or offline — show app anyway with trial fallback
-    // DO NOT redirect — the user is logged in, Firestore rules may just need fixing
-    const now = Date.now();
-    data = {
-      uid: user.uid, email: user.email,
-      name: user.displayName || user.email,
-      plan: 'trial', trialStart: now,
-      trialEnd: now + 7 * 86400000, blocked: false
-    };
-  }
-
-  // ── Expose to non-module GIS script ──
-  window._uid       = user.uid;
-  window._userData  = data;
-  window._auth      = auth;
-  window._db        = db;
-  window._updateDoc = updateDoc;
-  window._doc       = doc;
-  window._planMs    = PLAN_MS;
-
-  // ── Set user bar text ──
-  document.getElementById('displayName').textContent = data.name || user.displayName || 'User';
-  document.getElementById('userEmail').textContent   = data.email || user.email;
-
-  // ── Evaluate plan / trial ──
-  evaluateAccess(data);
-
-  // ── NOW reveal page and init map (body was invisible until here) ──
-  document.body.classList.add('ready');
-
-  // Small timeout lets the browser paint the visible body before Leaflet measures #map
-  setTimeout(() => { window.initMap(); }, 50);
+  db.collection('users').doc(user.uid).get()
+    .then(function(snap){
+      var data;
+      if(snap.exists){
+        data = snap.data();
+      } else {
+        var now = Date.now();
+        data = {uid:user.uid,email:user.email,name:user.displayName||user.email,
+                plan:'trial',trialStart:now,trialEnd:now+7*86400000,
+                licenseKey:null,licenseExpiry:null,blocked:false};
+        db.collection('users').doc(user.uid).set(data).catch(function(){});
+      }
+      bootApp(user, data);
+    })
+    .catch(function(){
+      // Firestore failed — still show app with trial
+      var now = Date.now();
+      bootApp(user,{uid:user.uid,email:user.email,name:user.displayName||user.email,
+                    plan:'trial',trialStart:now,trialEnd:now+7*86400000,blocked:false});
+    });
 });
 
-function evaluateAccess(data) {
-  const now    = Date.now();
-  const plan   = data.plan || 'trial';
-  const badge  = document.getElementById('planBadge');
-  const banner = document.getElementById('statusBanner');
-  const upgBtn = document.getElementById('upgradeBtn');
+function bootApp(user, data){
+  document.getElementById('uName').textContent  = data.name  || user.displayName || 'User';
+  document.getElementById('uEmail').textContent = data.email || user.email;
+  evalAccess(data);
+  document.getElementById('panel').style.display = 'block';
+  document.getElementById('map').style.display   = 'block';
+  document.getElementById('loader').style.display= 'none';
+  setTimeout(initMap, 60);
+}
 
-  // Unlock all pro features first
-  document.querySelectorAll('.pro-gate').forEach(el => el.classList.remove('locked-feature'));
-  document.querySelectorAll('.pro-badge').forEach(el => el.remove());
-
-  if (plan === 'trial') {
-    const msLeft = (data.trialEnd || 0) - now;
-    badge.className  = 'plan-badge badge-trial';
-    badge.textContent = 'Trial';
-    if (msLeft <= 0) {
-      banner.className = 'banner-expired';
-      banner.innerHTML = '❌ Free trial expired — upgrade to continue.';
-      document.querySelectorAll('.pro-gate').forEach(el => el.classList.add('locked-feature'));
-      document.getElementById('expiredOverlay').classList.add('show');
-      window._isPro = false;
+function evalAccess(data){
+  var now=Date.now(), plan=data.plan||'trial';
+  var badge=document.getElementById('uBadge'), banner=document.getElementById('statusBanner'), upgBtn=document.getElementById('upgBtn');
+  document.querySelectorAll('.pro-gate').forEach(function(el){el.classList.remove('locked-feature');});
+  if(plan==='trial'){
+    var ms=(data.trialEnd||0)-now;
+    badge.className='plan-badge badge-trial'; badge.textContent='Trial';
+    if(ms<=0){
+      banner.className='banner-expired'; banner.innerHTML='❌ Trial expired — upgrade to continue.';
+      document.querySelectorAll('.pro-gate').forEach(function(el){el.classList.add('locked-feature');});
+      document.getElementById('expOv').classList.add('show'); _isPro=false;
     } else {
-      const d = Math.floor(msLeft/86400000), h = Math.floor((msLeft%86400000)/3600000);
-      banner.className = 'banner-trial';
-      banner.innerHTML = `⏳ <b>Trial: ${d}d ${h}h remaining</b> — All Pro features unlocked`;
-      window._isPro = true;
+      var d=Math.floor(ms/86400000),h=Math.floor((ms%86400000)/3600000);
+      banner.className='banner-trial'; banner.innerHTML='⏳ <b>Trial: '+d+'d '+h+'h left</b> — All Pro features unlocked';
+      _isPro=true;
     }
-  } else if (['monthly','yearly','lifetime'].includes(plan)) {
-    const expiry  = data.licenseExpiry || 0;
-    const msLeft  = expiry - now;
-    const expired = plan !== 'lifetime' && msLeft <= 0;
-    const label   = plan.charAt(0).toUpperCase() + plan.slice(1);
-    if (expired) {
-      banner.className  = 'banner-expired';
-      banner.innerHTML  = `❌ Your ${label} plan expired. Please renew.`;
-      document.querySelectorAll('.pro-gate').forEach(el => el.classList.add('locked-feature'));
-      document.getElementById('expiredOverlay').classList.add('show');
-      badge.className   = 'plan-badge badge-trial';
-      badge.textContent = 'Expired';
-      window._isPro = false;
+  } else if(plan==='monthly'||plan==='yearly'||plan==='lifetime'){
+    var exp=data.licenseExpiry||0, ms2=exp-now, expired=plan!=='lifetime'&&ms2<=0;
+    var lbl=plan.charAt(0).toUpperCase()+plan.slice(1);
+    if(expired){
+      banner.className='banner-expired'; banner.innerHTML='❌ '+lbl+' plan expired. Please renew.';
+      document.querySelectorAll('.pro-gate').forEach(function(el){el.classList.add('locked-feature');});
+      document.getElementById('expOv').classList.add('show');
+      badge.className='plan-badge badge-trial'; badge.textContent='Expired'; _isPro=false;
     } else {
-      const left = plan === 'lifetime' ? '∞ Lifetime' : Math.floor(msLeft/86400000)+'d left';
-      banner.className  = 'banner-pro';
-      banner.innerHTML  = `✅ <b>${label} Pro</b> — ${left}`;
-      badge.className   = `plan-badge badge-${plan}`;
-      badge.textContent = label;
-      upgBtn.style.display = 'none';
-      window._isPro = true;
+      var left=plan==='lifetime'?'∞ Lifetime':Math.floor(ms2/86400000)+'d left';
+      banner.className='banner-pro'; banner.innerHTML='✅ <b>'+lbl+' Pro</b> — '+left;
+      badge.className='plan-badge badge-'+plan; badge.textContent=lbl;
+      upgBtn.style.display='none'; _isPro=true;
     }
   }
 }
 
-// ── License key activation ──
-window.applyLicenseKey = async function() {
-  const key   = document.getElementById('licenseKeyInput').value.trim();
-  const msgEl = document.getElementById('licenseMsg');
-  if (!key) return inlineMsg(msgEl,'error','Please enter a license key.');
-  try {
-    const keySnap = await getDoc(doc(db,'licenses',key));
-    if (!keySnap.exists()) return inlineMsg(msgEl,'error','❌ Invalid license key.');
-    const kd = keySnap.data();
-    if (kd.used && kd.usedBy !== window._uid)
-      return inlineMsg(msgEl,'error','❌ This key has already been used by another account.');
-    if (kd.expiry && kd.expiry < Date.now())
-      return inlineMsg(msgEl,'error','❌ This license key has expired.');
-    const plan      = kd.plan;
-    const newExpiry = Date.now() + (window._planMs[plan] || window._planMs.monthly);
-    await updateDoc(doc(db,'users',window._uid), { plan, licenseKey:key, licenseExpiry:newExpiry });
-    await updateDoc(doc(db,'licenses',key), { used:true, usedBy:window._uid, usedAt:Date.now() });
-    inlineMsg(msgEl,'success','✅ '+plan+' plan activated! Reloading...');
-    setTimeout(() => { hidePurchaseModal(); location.reload(); }, 1500);
-  } catch(e) { inlineMsg(msgEl,'error','Error: '+e.message); }
-};
+function doLogout(){ auth.signOut().then(function(){window.location.replace('login.html');}); }
 
-function inlineMsg(el,type,text){el.className='msg-inline '+type;el.innerHTML=text;el.style.display='block';}
+function activateLic(){
+  var key=document.getElementById('licInput').value.trim();
+  var msgEl=document.getElementById('licMsg');
+  if(!key) return iMsg(msgEl,'error','Enter a license key.');
+  db.collection('licenses').doc(key).get()
+    .then(function(snap){
+      if(!snap.exists) return iMsg(msgEl,'error','❌ Invalid license key.');
+      var kd=snap.data();
+      if(kd.used&&kd.usedBy!==auth.currentUser.uid) return iMsg(msgEl,'error','❌ Key already used.');
+      if(kd.expiry&&kd.expiry<Date.now()) return iMsg(msgEl,'error','❌ Key expired.');
+      var plan=kd.plan, exp=Date.now()+(PLAN_MS[plan]||PLAN_MS.monthly);
+      db.collection('users').doc(auth.currentUser.uid).update({plan:plan,licenseKey:key,licenseExpiry:exp})
+        .then(function(){
+          db.collection('licenses').doc(key).update({used:true,usedBy:auth.currentUser.uid,usedAt:Date.now()});
+          iMsg(msgEl,'success','✅ '+plan+' activated! Reloading...');
+          setTimeout(function(){hideModal();location.reload();},1500);
+        });
+    })
+    .catch(function(e){iMsg(msgEl,'error','Error: '+e.message);});
+}
+function iMsg(el,t,x){el.className='mi '+t;el.innerHTML=x;el.style.display='block';}
+function selPlan(p){['M','Y','L'].forEach(function(k){var el=document.getElementById('p'+k);if(el)el.classList.toggle('selected',k.toLowerCase()===p[0]);});}
+function showModal(){document.getElementById('purOv').classList.add('show');}
+function hideModal(){document.getElementById('purOv').classList.remove('show');}
+function checkAccess(){if(_isPro)return true;showModal();return false;}
 
-window.doLogout = async function() {
-  await signOut(auth);
-  window.location.replace('login.html');
-};
-</script>
+// ── KML ──
+var KML={convert:function(gj){return'<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document>\n'+gj.features.map(this.fp,this).join('\n')+'\n</Document></kml>';},fp:function(f){var p=f.properties||{},nm=p.name||p.NAME||'Feature',g=this.geo(f.geometry);if(!g)return'';return'<Placemark><name>'+this.e(String(nm))+'</name>'+g+'</Placemark>';},geo:function(g){if(!g)return'';if(g.type==='Point')return'<Point><coordinates>'+g.coordinates[0]+','+g.coordinates[1]+',0</coordinates></Point>';if(g.type==='LineString')return'<LineString><coordinates>'+this.cs(g.coordinates)+'</coordinates></LineString>';if(g.type==='Polygon')return'<Polygon>'+g.coordinates.map(this.ring,this).join('')+'</Polygon>';return'';},ring:function(c,i){var t=i===0?'outerBoundaryIs':'innerBoundaryIs';return'<'+t+'><LinearRing><coordinates>'+this.cs(c)+'</coordinates></LinearRing></'+t+'>';},cs:function(c){return c.map(function(p){return p[0]+','+p[1]+',0';}).join(' ');},e:function(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}};
 
-<!-- GIS App (non-module) -->
-<script>
-// KML export
-const GeoJSONtoKML={convert(gj){return`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n${gj.features.map(f=>this._fp(f)).join('\n')}\n  </Document>\n</kml>`;},_fp(f){const p=f.properties||{},nm=p.name||p.NAME||'Feature',desc=Object.entries(p).map(([k,v])=>`${k}: ${v}`).join('&#10;'),g=this._g(f.geometry);if(!g)return'';return`    <Placemark>\n      <n>${this._e(String(nm))}</n>\n      <description>${this._e(desc)}</description>\n      ${g}\n    </Placemark>`;},_g(g){if(!g)return'';if(g.type==='Point')return`<Point><coordinates>${g.coordinates[0]},${g.coordinates[1]},0</coordinates></Point>`;if(g.type==='LineString')return`<LineString><coordinates>${this._cs(g.coordinates)}</coordinates></LineString>`;if(g.type==='Polygon')return`<Polygon>${g.coordinates.map((r,i)=>this._r(r,i)).join('')}</Polygon>`;if(g.type==='MultiPolygon')return`<MultiGeometry>${g.coordinates.map(p=>`<Polygon>${p.map((r,i)=>this._r(r,i)).join('')}</Polygon>`).join('')}</MultiGeometry>`;return'';},_r(c,i){const t=i===0?'outerBoundaryIs':'innerBoundaryIs';return`<${t}><LinearRing><coordinates>${this._cs(c)}</coordinates></LinearRing></${t}>`;},_cs(c){return c.map(p=>`${p[0]},${p[1]},0`).join(' ');},_e(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}};
+// ── CSV ──
+function parseCSV(text){function tok(l){var f=[],i=0;while(i<l.length){if(l[i]==='"'){var s='';i++;while(i<l.length){if(l[i]==='"'&&l[i+1]==='"'){s+='"';i+=2;}else if(l[i]==='"'){i++;break;}else s+=l[i++];}f.push(s);if(l[i]===',')i++;}else{var st=i;while(i<l.length&&l[i]!==',')i++;f.push(l.slice(st,i).trim());if(l[i]===',')i++;}}return f;}var lines=[],cur='',inQ=false;for(var i=0;i<text.length;i++){var c=text[i];if(c==='"')inQ=!inQ;if((c==='\n'||c==='\r')&&!inQ){if(cur.trim())lines.push(cur);cur='';if(c==='\r'&&text[i+1]==='\n')i++;}else cur+=c;}if(cur.trim())lines.push(cur);if(lines.length<2)return[];var hdrs=tok(lines[0]).map(function(h){return h.toLowerCase().trim();});var feats=[],wp=/^(POINT|LINESTRING|POLYGON|MULTI)/i;for(var r=1;r<lines.length;r++){var cols=tok(lines[r]),props={};hdrs.forEach(function(h,i){props[h]=cols[i]!==undefined?cols[i]:'';});var geom=null;for(var k in props){if(wp.test(String(props[k]).trim())){try{geom=wellknown.parse(String(props[k]).trim());}catch(e){}if(geom)break;}}if(!geom){var lk=hdrs.find(function(h){return['lat','latitude','y'].indexOf(h)>=0;}),lnk=hdrs.find(function(h){return['lon','lng','longitude','x'].indexOf(h)>=0;});if(lk&&lnk){var la=parseFloat(props[lk]),lo=parseFloat(props[lnk]);if(!isNaN(la)&&!isNaN(lo))geom={type:'Point',coordinates:[lo,la]};}}if(geom)feats.push({type:'Feature',geometry:geom,properties:props});}return feats;}
 
-// CSV parser
-function parseCSVRobust(text){function tok(line){const f=[];let i=0;while(i<line.length){if(line[i]==='"'){let s='';i++;while(i<line.length){if(line[i]==='"'&&line[i+1]==='"'){s+='"';i+=2;}else if(line[i]==='"'){i++;break;}else s+=line[i++];}f.push(s);if(line[i]===',')i++;}else{let s=i;while(i<line.length&&line[i]!==',')i++;f.push(line.slice(s,i).trim());if(line[i]===',')i++;}}return f;}const lines=[];let cur='',inQ=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"')inQ=!inQ;if((c==='\n'||c==='\r')&&!inQ){if(cur.trim())lines.push(cur);cur='';if(c==='\r'&&text[i+1]==='\n')i++;}else cur+=c;}if(cur.trim())lines.push(cur);if(lines.length<2)return[];const headers=tok(lines[0]).map(h=>h.toLowerCase().trim());const features=[];const wp=/^(POINT|LINESTRING|POLYGON|MULTI)/i;for(let r=1;r<lines.length;r++){const cols=tok(lines[r]);const props={};headers.forEach((h,i)=>{props[h]=cols[i]!==undefined?cols[i]:'';});let geom=null;for(const v of Object.values(props)){if(wp.test(String(v).trim())){try{geom=wellknown.parse(String(v).trim());}catch(e){}if(geom)break;}}if(!geom){const lk=headers.find(h=>['lat','latitude','y'].includes(h)),lnk=headers.find(h=>['lon','lng','longitude','x'].includes(h));if(lk&&lnk){const la=parseFloat(props[lk]),lo=parseFloat(props[lnk]);if(!isNaN(la)&&!isNaN(lo))geom={type:'Point',coordinates:[lo,la]};}}if(geom)features.push({type:'Feature',geometry:geom,properties:props});}return features;}
+// ── GIS functions ──
+function clrSel(){if(selFeature){selFeature.layer.setStyle({weight:2,color:selFeature.color});selFeature=null;}}
+function updCoords(ll){if(!ll)return;document.getElementById('lat').value=ll.lat.toFixed(8);document.getElementById('lon').value=ll.lng.toFixed(8);}
 
-function checkAccess(){if(window._isPro)return true;showPurchaseModal();return false;}
+function updStats(){var tF=0,tA=0,tL=0;Object.keys(layersStore).forEach(function(id){if(map.hasLayer(layersStore[id].layer)){tF+=layersStore[id].geojson.features.length;layersStore[id].geojson.features.forEach(function(f){if(f.geometry&&f.geometry.type.indexOf('Polygon')>=0)tA+=turf.area(f);if(f.geometry&&f.geometry.type.indexOf('LineString')>=0)tL+=turf.length(f,{units:'kilometers'});});}});document.getElementById('featCount').innerText=tF;document.getElementById('totalArea').innerText=tA.toLocaleString(undefined,{maximumFractionDigits:0});document.getElementById('totalLength').innerText=tL.toFixed(2);if(legend)legend.update();}
 
-// Purchase modal
-let selectedPlan='yearly';
-function selectPlan(plan){selectedPlan=plan;['Monthly','Yearly','Lifetime'].forEach(p=>{const el=document.getElementById('plan'+p);if(el)el.classList.toggle('selected',p.toLowerCase()===plan);});}
-window.showPurchaseModal=function(){document.getElementById('purchaseOverlay').classList.add('show');};
-window.hidePurchaseModal=function(){document.getElementById('purchaseOverlay').classList.remove('show');};
-window.selectPlan=selectPlan;
+function refreshUI(){var ll=document.getElementById('layerList');var b=document.getElementById('bufLayer'),s=document.getElementById('searchLayer'),i1=document.getElementById('intLayer1'),i2=document.getElementById('intLayer2'),sy=document.getElementById('symLayer');ll.innerHTML='';var def='<option value="">-- Choose --</option>';b.innerHTML=s.innerHTML=i1.innerHTML=i2.innerHTML=sy.innerHTML=def;Object.keys(layersStore).forEach(function(id){var lD=layersStore[id],vis=map.hasLayer(lD.layer);[b,s,i1,i2,sy].forEach(function(sel){var o=document.createElement('option');o.value=id;o.innerText=lD.name;sel.appendChild(o);});var div=document.createElement('div');div.className='layer-item';div.innerHTML='<div class="layer-header"><div class="layer-title">'+lD.name+'</div><div style="display:flex;gap:5px"><div class="export-dropdown"><button class="action-icon">📥</button><div class="export-content"><button onclick="expLay(\''+id+'\',\'geojson\')">GeoJSON</button><button onclick="expLay(\''+id+'\',\'csv\')">CSV</button><button onclick="expLay(\''+id+'\',\'kml\')">KML</button></div></div><button class="action-icon" onclick="togLay(\''+id+'\',this)">'+(vis?'👁️':'🕶️')+'</button><button class="action-icon" onclick="delLay(\''+id+'\')" style="color:red">🗑️</button></div></div><span style="font-size:11px;color:#666">Features: '+lD.geojson.features.length+'</span><input type="range" min="0" max="1" step="0.1" value="0.5" oninput="setOpacity(\''+id+'\',this.value)" style="margin-top:5px">';ll.appendChild(div);});}
 
-// GIS core
-let map,legend,layersStore={},selectedFeature=null;
+function addLayer(name,geojson){if(!geojson||!geojson.features)geojson=turf.featureCollection(Array.isArray(geojson)?geojson:[geojson]);var lid='l_'+Date.now(),clr='#'+Math.floor(Math.random()*16777215).toString(16).padStart(6,'0');var layer=L.geoJSON(geojson,{style:{color:clr,weight:2,fillOpacity:.5},onEachFeature:function(f,l){var t="<span class='popup-header-text'>Data:</span><div class='popup-table-container'><table class='popup-table'>";for(var k in f.properties)t+='<tr><td>'+k+'</td><td>'+(f.properties[k]||'')+'</td></tr>';l.bindPopup(t+'</table></div>',{maxWidth:320});l.on('click',function(e){L.DomEvent.stopPropagation(e);updCoords(e.latlng);clrSel();selFeature={f:f,layer:l,lid:lid,color:clr};l.setStyle({weight:5,color:'yellow'});document.getElementById('bufLayer').value=lid;});}}).addTo(map);layersStore[lid]={layer:layer,geojson:geojson,name:name,color:clr};refreshUI();updStats();if(geojson.features.length>0)map.fitBounds(layer.getBounds());}
 
-function clearSelection(){if(selectedFeature){selectedFeature.layer.setStyle({weight:2,color:selectedFeature.color});selectedFeature=null;}}
-function updateCoordinateInputs(ll){if(!ll)return;document.getElementById('lat').value=ll.lat.toFixed(8);document.getElementById('lon').value=ll.lng.toFixed(8);}
+function expLay(id,fmt){var data=JSON.parse(JSON.stringify(layersStore[id].geojson)),name=layersStore[id].name.split('.')[0];var content,mime,ext;if(fmt==='geojson'){content=JSON.stringify(data);mime='application/json';ext='geojson';}else if(fmt==='csv'){if(!data.features.length)return alert('Empty!');var esc=function(v){return'"'+String(v===null||v===undefined?'':v).replace(/"/g,'""')+'"';};var hdr=Object.keys(data.features[0].properties).concat(['WKT']);var rows=data.features.map(function(f){var p=Object.values(f.properties).map(esc);p.push(esc(wellknown.stringify(f.geometry)));return p.join(',');});content=[hdr.map(esc).join(',')].concat(rows).join('\n');mime='text/csv';ext='csv';}else{content=KML.convert(data);mime='application/vnd.google-earth.kml+xml';ext='kml';}var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:mime}));a.download=name+'_export.'+ext;a.click();}
 
-function updateVisibleStats(){let tF=0,tA=0,tL=0;Object.keys(layersStore).forEach(id=>{if(map.hasLayer(layersStore[id].layer)){tF+=layersStore[id].geojson.features.length;layersStore[id].geojson.features.forEach(f=>{if(f.geometry&&f.geometry.type.includes('Polygon'))tA+=turf.area(f);if(f.geometry&&f.geometry.type.includes('LineString'))tL+=turf.length(f,{units:'kilometers'});});}});document.getElementById('featCount').innerText=tF;document.getElementById('totalArea').innerText=tA.toLocaleString(undefined,{maximumFractionDigits:0});document.getElementById('totalLength').innerText=tL.toFixed(2);if(legend)legend.update();}
+document.getElementById('fileInput').addEventListener('change',function(e){var file=e.target.files[0];if(!file)return;var r=new FileReader(),ext=file.name.split('.').pop().toLowerCase();if(ext==='csv'){r.onload=function(ev){var f=parseCSV(ev.target.result);if(!f.length)return alert('No geometry found.');addLayer(file.name,f);};r.readAsText(file);}else if(ext==='zip'){r.onload=function(ev){shp(ev.target.result).then(function(gj){addLayer(file.name,gj);});};r.readAsArrayBuffer(file);}else{r.onload=function(ev){addLayer(file.name,JSON.parse(ev.target.result));};r.readAsText(file);}});
 
-function refreshLayerUI(){const list=document.getElementById('layerList');const b=document.getElementById('bufLayerSelect'),s=document.getElementById('searchLayerSelect');const i1=document.getElementById('intLayer1'),i2=document.getElementById('intLayer2'),sy=document.getElementById('symLayerSelect');list.innerHTML='';const def='<option value="">-- Choose --</option>';b.innerHTML=s.innerHTML=i1.innerHTML=i2.innerHTML=sy.innerHTML=def;Object.keys(layersStore).forEach(id=>{const lD=layersStore[id],vis=map.hasLayer(lD.layer);[b,s,i1,i2,sy].forEach(sel=>{const o=document.createElement('option');o.value=id;o.innerText=lD.name;sel.appendChild(o);});const div=document.createElement('div');div.className='layer-item';div.innerHTML=`<div class="layer-header"><div class="layer-title">${lD.name}</div><div style="display:flex;gap:5px;"><div class="export-dropdown"><button class="action-icon">📥</button><div class="export-content"><button onclick="exportLayer('${id}','geojson')">GeoJSON</button><button onclick="exportLayer('${id}','csv')">CSV</button><button onclick="exportLayer('${id}','kml')">KML</button></div></div><button class="action-icon" onclick="toggleBtnClick('${id}',this)">${vis?'👁️':'🕶️'}</button><button class="action-icon" onclick="deleteLayer('${id}')" style="color:red">🗑️</button></div></div><span style="font-size:11px;color:#666;">Features: ${lD.geojson.features.length}</span><input type="range" min="0" max="1" step="0.1" value="0.5" oninput="updateOpacity('${id}',this.value)" style="margin-top:5px;">`;list.appendChild(div);});}
+function runIntersect(){if(!checkAccess())return;var id1=document.getElementById('intLayer1').value,id2=document.getElementById('intLayer2').value;if(!id1||!id2)return alert('Select both layers!');var res=layersStore[id1].geojson.features.filter(function(f){return layersStore[id2].geojson.features.some(function(p){return turf.booleanIntersects(f,p);});});if(res.length>0)addLayer('Int_'+res.length,turf.featureCollection(res));}
+function runBuffer(){if(!checkAccess())return;var id=document.getElementById('bufLayer').value,dist=parseFloat(document.getElementById('bufDist').value),unit=document.getElementById('bufUnit').value;if(!id||isNaN(dist))return;var geo=(selFeature&&selFeature.lid===id)?turf.featureCollection([selFeature.f]):layersStore[id].geojson;addLayer('Buf_'+dist,turf.buffer(geo,dist,{units:unit}));}
+function updateSearchFields(){var id=document.getElementById('searchLayer').value,sel=document.getElementById('searchField');sel.innerHTML='<option value="">-- Field --</option>';if(id&&layersStore[id])Object.keys(layersStore[id].geojson.features[0].properties).forEach(function(k){sel.innerHTML+='<option value="'+k+'">'+k+'</option>';});}
+function doSearch(){var id=document.getElementById('searchLayer').value,f=document.getElementById('searchField').value,t=document.getElementById('searchVal').value.trim();if(!id||!f||!t)return;var found=false;layersStore[id].layer.eachLayer(function(l){if(String(l.feature.properties[f]||'').trim()===t){found=true;l.openPopup();if(l.getBounds)map.fitBounds(l.getBounds());else map.setView(l.getLatLng(),15);}});if(!found)alert('No match.');}
+function updateSymFields(){var id=document.getElementById('symLayer').value,sel=document.getElementById('symField');sel.innerHTML='<option value="">-- Field --</option>';if(id&&layersStore[id])Object.keys(layersStore[id].geojson.features[0].properties).forEach(function(k){sel.innerHTML+='<option value="'+k+'">'+k+'</option>';});}
+function applySymbology(){if(!checkAccess())return;var id=document.getElementById('symLayer').value,field=document.getElementById('symField').value;if(!id||!field)return;var colors={};layersStore[id].layer.eachLayer(function(l){var v=l.feature.properties[field]||'N/A';if(!colors[v])colors[v]='#'+Math.floor(Math.random()*16777215).toString(16);l.setStyle({color:colors[v],fillColor:colors[v]});});}
+function dropPoint(){var la=parseFloat(document.getElementById('lat').value),lo=parseFloat(document.getElementById('lon').value);if(!isNaN(la)){L.marker([la,lo]).addTo(map).bindPopup(la+', '+lo).openPopup();map.setView([la,lo],14);}}
+function drawWKT(){try{var gj=wellknown.parse(document.getElementById('wkt').value);if(gj)addLayer('WKT',turf.featureCollection([{type:'Feature',geometry:gj,properties:{source:'Manual'}}]));}catch(e){alert('Invalid WKT');}}
+function togLay(id,btn){if(map.hasLayer(layersStore[id].layer)){map.removeLayer(layersStore[id].layer);btn.innerText='🕶️';}else{map.addLayer(layersStore[id].layer);btn.innerText='👁️';}updStats();}
+function delLay(id){if(confirm('Delete?')){map.removeLayer(layersStore[id].layer);delete layersStore[id];refreshUI();updStats();}}
+function setOpacity(id,val){layersStore[id].layer.setStyle({fillOpacity:val,opacity:val});}
 
-function addLayerToSystem(name,geojson){if(!geojson||!geojson.features)geojson=turf.featureCollection(Array.isArray(geojson)?geojson:[geojson]);const lid='l_'+Date.now();const clr='#'+Math.floor(Math.random()*16777215).toString(16).padStart(6,'0');const layer=L.geoJSON(geojson,{style:{color:clr,weight:2,fillOpacity:0.5},onEachFeature:(f,l)=>{let t="<span class='popup-header-text'>Data:</span><div class='popup-table-container'><table class='popup-table'>";for(let k in f.properties)t+=`<tr><td>${k}</td><td>${f.properties[k]||''}</td></tr>`;l.bindPopup(t+'</table></div>',{maxWidth:320});l.on('click',(e)=>{L.DomEvent.stopPropagation(e);updateCoordinateInputs(e.latlng);clearSelection();selectedFeature={f,layer:l,lid,color:clr};l.setStyle({weight:5,color:'yellow'});document.getElementById('bufLayerSelect').value=lid;});}}).addTo(map);layersStore[lid]={layer,geojson,name,color:clr};refreshLayerUI();updateVisibleStats();if(geojson.features.length>0)map.fitBounds(layer.getBounds());}
-
-function exportLayer(id,fmt){const data=JSON.parse(JSON.stringify(layersStore[id].geojson)),name=layersStore[id].name.split('.')[0];let content,mime,ext;if(fmt==='geojson'){content=JSON.stringify(data);mime='application/json';ext='geojson';}else if(fmt==='csv'){if(!data.features.length)return alert('Empty Layer');const esc=v=>'"'+String(v===null||v===undefined?'':v).replace(/"/g,'""')+'"';const hdr=[...Object.keys(data.features[0].properties),'WKT'];const rows=data.features.map(f=>{const p=Object.values(f.properties).map(v=>esc(v));p.push(esc(wellknown.stringify(f.geometry)));return p.join(',');});content=[hdr.map(h=>esc(h)).join(','),...rows].join('\n');mime='text/csv';ext='csv';}else if(fmt==='kml'){content=GeoJSONtoKML.convert(data);mime='application/vnd.google-earth.kml+xml';ext='kml';}const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:mime}));a.download=`${name}_export.${ext}`;a.click();}
-
-document.getElementById('fileInput').addEventListener('change',function(e){const file=e.target.files[0];if(!file)return;const r=new FileReader(),ext=file.name.split('.').pop().toLowerCase();if(ext==='csv'){r.onload=ev=>{const f=parseCSVRobust(ev.target.result);if(!f.length){alert('No valid geometry found.');return;}addLayerToSystem(file.name,f);};r.readAsText(file);}else if(ext==='zip'){r.onload=ev=>shp(ev.target.result).then(gj=>addLayerToSystem(file.name,gj));r.readAsArrayBuffer(file);}else{r.onload=ev=>addLayerToSystem(file.name,JSON.parse(ev.target.result));r.readAsText(file);}});
-
-function runAdvancedIntersection(){if(!checkAccess())return;const id1=document.getElementById('intLayer1').value,id2=document.getElementById('intLayer2').value;if(!id1||!id2)return alert('Select layers!');const res=layersStore[id1].geojson.features.filter(f=>layersStore[id2].geojson.features.some(p=>turf.booleanIntersects(f,p)));if(res.length>0)addLayerToSystem(`Int_${res.length}`,turf.featureCollection(res));}
-function runBuffer(){if(!checkAccess())return;const id=document.getElementById('bufLayerSelect').value,dist=parseFloat(document.getElementById('bufDist').value),unit=document.getElementById('bufUnit').value;if(!id||isNaN(dist))return;const geo=(selectedFeature&&selectedFeature.lid===id)?turf.featureCollection([selectedFeature.f]):layersStore[id].geojson;addLayerToSystem(`Buf_${dist}`,turf.buffer(geo,dist,{units:unit}));}
-function updateSearchFields(){const id=document.getElementById('searchLayerSelect').value,sel=document.getElementById('searchFieldSelect');sel.innerHTML='<option value="">-- Field --</option>';if(id&&layersStore[id])Object.keys(layersStore[id].geojson.features[0].properties).forEach(k=>{sel.innerHTML+=`<option value="${k}">${k}</option>`;});}
-function performTargetedSearch(){const id=document.getElementById('searchLayerSelect').value,f=document.getElementById('searchFieldSelect').value,t=document.getElementById('searchInput').value.trim();if(!id||!f||!t)return;let found=false;layersStore[id].layer.eachLayer(l=>{if(String(l.feature.properties[f]||'').trim()===t){found=true;l.openPopup();if(l.getBounds)map.fitBounds(l.getBounds());else map.setView(l.getLatLng(),15);}});if(!found)alert('No match found.');}
-function updateSymFields(){const id=document.getElementById('symLayerSelect').value,sel=document.getElementById('symFieldSelect');sel.innerHTML='<option value="">-- Field --</option>';if(id&&layersStore[id])Object.keys(layersStore[id].geojson.features[0].properties).forEach(k=>{sel.innerHTML+=`<option value="${k}">${k}</option>`;});}
-function applySymbology(){if(!checkAccess())return;const id=document.getElementById('symLayerSelect').value,field=document.getElementById('symFieldSelect').value;if(!id||!field)return;const colors={};layersStore[id].layer.eachLayer(l=>{const v=l.feature.properties[field]||'N/A';if(!colors[v])colors[v]='#'+Math.floor(Math.random()*16777215).toString(16);l.setStyle({color:colors[v],fillColor:colors[v]});});}
-function showPoint(){const la=parseFloat(document.getElementById('lat').value),lo=parseFloat(document.getElementById('lon').value);if(!isNaN(la))L.marker([la,lo]).addTo(map).bindPopup(`${la}, ${lo}`).openPopup(),map.setView([la,lo],14);}
-function drawWKT(){try{const gj=wellknown.parse(document.getElementById('wkt').value);if(gj)addLayerToSystem('WKT',turf.featureCollection([{type:'Feature',geometry:gj,properties:{source:'Manual'}}]));}catch(e){alert('Invalid WKT');}}
-function toggleBtnClick(id,btn){if(map.hasLayer(layersStore[id].layer)){map.removeLayer(layersStore[id].layer);btn.innerText='🕶️';}else{map.addLayer(layersStore[id].layer);btn.innerText='👁️';}updateVisibleStats();}
-function deleteLayer(id){if(confirm('Delete?')){map.removeLayer(layersStore[id].layer);delete layersStore[id];refreshLayerUI();updateVisibleStats();}}
-function updateOpacity(id,val){layersStore[id].layer.setStyle({fillOpacity:val,opacity:val});}
-
-// initMap called by Firebase module AFTER body is visible
-window.initMap = function(){
-  const myRenderer    = L.canvas({padding:0.5});
-  const streetView    = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-  const satelliteView = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
-  map = L.map('map',{center:[20,78],zoom:5,layers:[streetView],renderer:myRenderer});
-  L.control.layers({'Street':streetView,'Satellite':satelliteView}).addTo(map);
+function initMap(){
+  var myR=L.canvas({padding:.5});
+  var sv=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+  var sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+  map=L.map('map',{center:[20,78],zoom:5,layers:[sv],renderer:myR});
+  L.control.layers({'Street':sv,'Satellite':sat}).addTo(map);
   L.control.polylineMeasure({position:'topleft',unit:'kilometres'}).addTo(map);
-  map.on('click',(e)=>{updateCoordinateInputs(e.latlng);clearSelection();});
+  map.on('click',function(e){updCoords(e.latlng);clrSel();});
   legend=L.control({position:'bottomright'});
   legend.onAdd=function(){this._div=L.DomUtil.create('div','legend');this.update();return this._div;};
-  legend.update=function(){let h='<b>Legend</b><br>',v=false;Object.keys(layersStore).forEach(id=>{if(map.hasLayer(layersStore[id].layer)){h+=`<div><i style="background:${layersStore[id].color}"></i> ${layersStore[id].name}</div>`;v=true;}});this._div.innerHTML=v?h:'<b>Empty</b>';};
+  legend.update=function(){var h='<b>Legend</b><br>',v=false;Object.keys(layersStore).forEach(function(id){if(map.hasLayer(layersStore[id].layer)){h+='<div><i style="background:'+layersStore[id].color+'"></i> '+layersStore[id].name+'</div>';v=true;}});this._div.innerHTML=v?h:'<b>Empty</b>';};
   legend.addTo(map);
-};
+}
 </script>
 </body>
 </html>
