@@ -7,9 +7,9 @@
   <link rel="stylesheet" href="https://ppete2.github.io/Leaflet.PolylineMeasure/Leaflet.PolylineMeasure.css" />
   <style>
     * { box-sizing: border-box; }
-    body { margin:0; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; background: #f0f2f5; }
-    #panel { width: 380px; padding:15px; background:white; border-right: 1px solid #ddd; overflow-y: auto; z-index: 1000; }
-    #map { flex-grow: 1; cursor: crosshair; height: 100vh; width: 100%; }
+    body { margin:0; font-family: 'Segoe UI', sans-serif; height:100vh; background:#f0f2f5; overflow:hidden; }
+    #panel { width:380px; padding:15px; background:white; border-right:1px solid #ddd; overflow-y:auto; z-index:1000; height:100vh; flex-shrink:0; }
+    #map { flex-grow:1; cursor:crosshair; height:100vh; }
     .section { margin-bottom: 12px; padding: 12px; border: 1px solid #eee; border-radius: 8px; }
     .stats-card { background: #1b5e20; color: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
     .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 13px; }
@@ -90,11 +90,33 @@
     .exp-card button { padding:12px 28px; border:none; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; margin:4px; }
     .btn-upgrade { background:#2e7d32; color:white; }
     .btn-logout  { background:#eee; color:#333; }
+
+    /* App loader — shown until Firebase confirms auth */
+    #appLoader {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 40%, #0d3b6e 100%);
+      display: flex; flex-direction:column;
+      align-items:center; justify-content:center; z-index:9999;
+    }
+    #appLoader .spin { width:48px; height:48px; border:4px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:appSpin 0.7s linear infinite; }
+    #appLoader p { color:white; margin-top:18px; font-size:15px; font-weight:600; opacity:0.9; }
+    #appLoader small { color:rgba(255,255,255,0.6); font-size:12px; margin-top:6px; }
+    @keyframes appSpin { to { transform:rotate(360deg); } }
+    /* Hide entire app until auth confirmed — use flex when shown to match body layout */
+    #appContent { display:none; width:100%; height:100vh; flex-direction:row; }
   </style>
 </head>
 <body>
 
-<div id="panel">
+<!-- Full-screen loader shown until Firebase auth state is confirmed -->
+<div id="appLoader">
+  <div class="spin"></div>
+  <p>🌍 GIS Viewer Pro</p>
+  <small>Verifying your session...</small>
+</div>
+
+<!-- App content — hidden until auth check completes -->
+<div id="appContent">
 
   <!-- User Info Bar -->
   <div id="userBar">
@@ -222,10 +244,11 @@
     <p>Your 7-day free trial has ended.<br>Upgrade to Pro to continue using all features.</p>
     <button class="btn-upgrade" onclick="document.getElementById('expiredOverlay').classList.remove('show');showPurchaseModal()">💎 View Plans & Upgrade</button>
     <button class="btn-logout" onclick="doLogout()">Logout</button>
-  </div>
-</div>
+  </div> <!-- end #expiredOverlay -->
 
-<div id="map"></div>
+  <div id="map"></div>
+
+</div> <!-- end #appContent -->
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
@@ -266,12 +289,24 @@
     lifetime: 36500 * 86400000
   };
 
-  // ── Auth guard — redirect if not logged in ──
+  // ── Auth guard — one-time check, no redirect loop ──
+  let authChecked = false;
+
   onAuthStateChanged(auth, async (user) => {
-    if (!user) { window.location.href = 'login.html'; return; }
+    if (authChecked) return;  // ← ignore re-fires
+    authChecked = true;
+
+    if (!user) {
+      // Not logged in — go to login page
+      window.location.replace('login.html');
+      return;
+    }
 
     const snap = await getDoc(doc(db, 'users', user.uid));
-    if (!snap.exists()) { window.location.href = 'login.html'; return; }
+    if (!snap.exists()) {
+      window.location.replace('login.html');
+      return;
+    }
 
     const data = snap.data();
 
@@ -286,6 +321,10 @@
     // Populate user bar
     document.getElementById('displayName').textContent = data.name || user.displayName || 'User';
     document.getElementById('userEmail').textContent   = data.email || user.email;
+
+    // Hide loader, reveal app with correct flex layout
+    document.getElementById('appLoader').style.display  = 'none';
+    document.getElementById('appContent').style.display = 'flex';
 
     evaluateAccess(data);
   });
