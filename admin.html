@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GIS Viewer — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root{
+      --bg:#0a0e13;
+      --surface:#111820;
+      --surface2:#1a2330;
+      --border:#1e2d3d;
+      --accent:#00e5ff;
+      --accent2:#69ff47;
+      --accent3:#ff6b35;
+      --warn:#ffd600;
+      --text:#e2eaf4;
+      --muted:#5a7a94;
+      --red:#ff4757;
+      --font:'Syne',sans-serif;
+      --mono:'JetBrains Mono',monospace;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden;}
+
+    /* Grid noise texture */
+    body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.015'%3E%3Cpath d='M0 0h40v1H0zM0 0v40h1V0z'/%3E%3C/g%3E%3C/svg%3E");pointer-events:none;z-index:0;}
+
+    /* Loader */
+    #loader{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;}
+    #loader .ring{width:56px;height:56px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+    #loader p{color:var(--accent);font-family:var(--mono);font-size:13px;margin-top:18px;letter-spacing:2px;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Sidebar */
+    #sidebar{position:fixed;left:0;top:0;width:220px;height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100;padding:0;}
+    .sidebar-logo{padding:24px 20px 20px;border-bottom:1px solid var(--border);}
+    .sidebar-logo h1{font-size:16px;font-weight:800;color:var(--accent);letter-spacing:1px;}
+    .sidebar-logo p{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:3px;}
+    .nav-item{display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:600;transition:all .2s;border-left:3px solid transparent;}
+    .nav-item:hover{color:var(--text);background:var(--surface2);}
+    .nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(0,229,255,.05);}
+    .nav-item .icon{font-size:16px;width:20px;text-align:center;}
+    .sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border);}
+    .admin-chip{background:rgba(255,107,53,.15);border:1px solid var(--accent3);color:var(--accent3);font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:4px;letter-spacing:1px;}
+    .logout-link{display:block;margin-top:10px;color:var(--muted);font-size:12px;cursor:pointer;font-family:var(--mono);}
+    .logout-link:hover{color:var(--red);}
+
+    /* Main */
+    #main{margin-left:220px;padding:32px;min-height:100vh;position:relative;z-index:1;}
+    .page{display:none;}
+    .page.active{display:block;}
+
+    /* Page header */
+    .page-header{margin-bottom:32px;}
+    .page-header h2{font-size:28px;font-weight:800;color:var(--text);}
+    .page-header p{color:var(--muted);font-size:13px;font-family:var(--mono);margin-top:4px;}
+
+    /* Stat cards */
+    .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;overflow:hidden;transition:border-color .2s;}
+    .stat-card:hover{border-color:var(--accent);}
+    .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+    .stat-card.c1::before{background:var(--accent);}
+    .stat-card.c2::before{background:var(--accent2);}
+    .stat-card.c3::before{background:var(--warn);}
+    .stat-card.c4::before{background:var(--accent3);}
+    .stat-label{font-size:11px;color:var(--muted);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;}
+    .stat-val{font-size:36px;font-weight:800;margin:8px 0 4px;line-height:1;}
+    .stat-card.c1 .stat-val{color:var(--accent);}
+    .stat-card.c2 .stat-val{color:var(--accent2);}
+    .stat-card.c3 .stat-val{color:var(--warn);}
+    .stat-card.c4 .stat-val{color:var(--accent3);}
+    .stat-sub{font-size:11px;color:var(--muted);font-family:var(--mono);}
+    .stat-icon{position:absolute;right:16px;top:16px;font-size:28px;opacity:.15;}
+
+    /* Tables */
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:24px;}
+    .card-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+    .card-title{font-size:14px;font-weight:700;color:var(--text);}
+    .card-body{padding:0;}
+    table{width:100%;border-collapse:collapse;}
+    th{padding:10px 16px;text-align:left;font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--surface2);}
+    td{padding:12px 16px;font-size:13px;border-bottom:1px solid rgba(30,45,61,.6);vertical-align:middle;}
+    tr:last-child td{border-bottom:none;}
+    tr:hover td{background:rgba(255,255,255,.02);}
+
+    /* Badges */
+    .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;font-family:var(--mono);letter-spacing:.5px;}
+    .badge-trial{background:rgba(255,214,0,.12);color:var(--warn);border:1px solid rgba(255,214,0,.3);}
+    .badge-monthly{background:rgba(0,229,255,.1);color:var(--accent);border:1px solid rgba(0,229,255,.25);}
+    .badge-yearly{background:rgba(105,255,71,.1);color:var(--accent2);border:1px solid rgba(105,255,71,.25);}
+    .badge-lifetime{background:rgba(255,107,53,.12);color:var(--accent3);border:1px solid rgba(255,107,53,.3);}
+    .badge-expired{background:rgba(255,71,87,.1);color:var(--red);border:1px solid rgba(255,71,87,.25);}
+    .badge-blocked{background:rgba(255,71,87,.2);color:var(--red);border:1px solid var(--red);}
+
+    /* Buttons */
+    .btn{padding:6px 12px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-family:var(--mono);font-weight:600;transition:all .2s;}
+    .btn-sm{padding:4px 8px;font-size:11px;}
+    .btn-primary{background:var(--accent);color:#000;}
+    .btn-primary:hover{background:#00b8cc;}
+    .btn-danger{background:transparent;color:var(--red);border:1px solid rgba(255,71,87,.4);}
+    .btn-danger:hover{background:rgba(255,71,87,.1);}
+    .btn-warn{background:transparent;color:var(--warn);border:1px solid rgba(255,214,0,.4);}
+    .btn-warn:hover{background:rgba(255,214,0,.08);}
+    .btn-success{background:transparent;color:var(--accent2);border:1px solid rgba(105,255,71,.4);}
+    .btn-success:hover{background:rgba(105,255,71,.08);}
+    .btn-ghost{background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+    .btn-ghost:hover{color:var(--text);}
+    .btn-group{display:flex;gap:6px;}
+
+    /* Search / filter bar */
+    .toolbar{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;background:var(--surface2);}
+    .search-box{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 12px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;}
+    .search-box:focus{border-color:var(--accent);}
+    .filter-sel{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;cursor:pointer;}
+    .filter-sel:focus{border-color:var(--accent);}
+
+    /* License page */
+    .lic-form{padding:20px;}
+    .form-row{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end;}
+    .fg{display:flex;flex-direction:column;gap:6px;}
+    .fg label{font-size:11px;color:var(--muted);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;}
+    .fg input,.fg select{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:9px 12px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;}
+    .fg input:focus,.fg select:focus{border-color:var(--accent);}
+    .fg select option{background:var(--surface);}
+
+    /* Key display */
+    .key-cell{font-family:var(--mono);font-size:12px;color:var(--accent);cursor:pointer;}
+    .key-cell:hover{text-decoration:underline;}
+
+    /* Chart bars */
+    .mini-bar{height:6px;background:var(--border);border-radius:3px;margin-top:4px;}
+    .mini-bar-fill{height:100%;border-radius:3px;background:var(--accent);transition:width .5s ease;}
+
+    /* Timeline / activity */
+    .activity-item{display:flex;gap:14px;padding:12px 20px;border-bottom:1px solid rgba(30,45,61,.5);}
+    .activity-item:last-child{border-bottom:none;}
+    .activity-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;}
+    .activity-dot.signup{background:var(--accent2);}
+    .activity-dot.upgrade{background:var(--accent);}
+    .activity-dot.expired{background:var(--red);}
+    .activity-time{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px;}
+
+    /* Toast */
+    #toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 18px;font-size:13px;font-family:var(--mono);z-index:9000;transform:translateY(80px);opacity:0;transition:all .3s;max-width:320px;}
+    #toast.show{transform:translateY(0);opacity:1;}
+    #toast.ok{border-left:3px solid var(--accent2);color:var(--accent2);}
+    #toast.err{border-left:3px solid var(--red);color:var(--red);}
+
+    /* Modal */
+    .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:5000;align-items:center;justify-content:center;}
+    .modal-bg.show{display:flex;}
+    .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;width:460px;max-width:95vw;}
+    .modal-box h3{font-size:18px;margin-bottom:6px;}
+    .modal-box p{color:var(--muted);font-size:13px;margin-bottom:20px;font-family:var(--mono);}
+    .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
+
+    /* Empty state */
+    .empty{padding:48px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:13px;}
+    .empty .ico{font-size:36px;margin-bottom:12px;}
+
+    /* Plan breakdown chart */
+    .plan-chart{display:flex;gap:0;height:8px;border-radius:4px;overflow:hidden;margin:12px 0 8px;}
+    .plan-seg{height:100%;transition:width .6s ease;}
+    .plan-labels{display:flex;gap:16px;flex-wrap:wrap;}
+    .plan-label{display:flex;align-items:center;gap:6px;font-size:11px;font-family:var(--mono);color:var(--muted);}
+    .plan-dot{width:8px;height:8px;border-radius:50%;}
+
+    /* Expiry warning row */
+    tr.expiring-soon td{background:rgba(255,214,0,.04);}
+    tr.expired-row td{background:rgba(255,71,87,.04);}
+
+    /* Loading skeleton */
+    .skel{background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.2s infinite;border-radius:4px;height:14px;}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+    /* Scrollbar */
+    ::-webkit-scrollbar{width:6px;}
+    ::-webkit-scrollbar-track{background:var(--bg);}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+    ::-webkit-scrollbar-thumb:hover{background:var(--muted);}
+  </style>
+</head>
+<body>
+
+<div id="loader"><div class="ring"></div><p>LOADING ADMIN...</p></div>
+
+<!-- Sidebar -->
+<div id="sidebar" style="display:none">
+  <div class="sidebar-logo">
+    <h1>⚡ GIS ADMIN</h1>
+    <p>Control Panel v1.0</p>
+  </div>
+  <nav style="flex:1;padding-top:8px;">
+    <div class="nav-item active" onclick="nav('overview')" id="nav-overview"><span class="icon">📊</span> Overview</div>
+    <div class="nav-item" onclick="nav('users')"    id="nav-users"   ><span class="icon">👥</span> Users</div>
+    <div class="nav-item" onclick="nav('licenses')" id="nav-licenses"><span class="icon">🔑</span> Licenses</div>
+    <div class="nav-item" onclick="nav('expiring')" id="nav-expiring"><span class="icon">⏰</span> Expiring</div>
+    <div class="nav-item" onclick="nav('activity')" id="nav-activity"><span class="icon">📋</span> Activity</div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="admin-chip">ADMIN ACCESS</div>
+    <div class="admin-email" id="adminEmail" style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:6px;"></div>
+    <span class="logout-link" onclick="doLogout()">→ logout</span>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div id="main" style="display:none">
+
+  <!-- ── OVERVIEW ── -->
+  <div class="page active" id="page-overview">
+    <div class="page-header">
+      <h2>Dashboard Overview</h2>
+      <p>// real-time data from Firestore</p>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card c1"><span class="stat-icon">👥</span><div class="stat-label">Total Users</div><div class="stat-val" id="s-total">—</div><div class="stat-sub" id="s-total-sub">loading...</div></div>
+      <div class="stat-card c2"><span class="stat-icon">💎</span><div class="stat-label">Paid Users</div><div class="stat-val" id="s-paid">—</div><div class="stat-sub" id="s-paid-sub">loading...</div></div>
+      <div class="stat-card c3"><span class="stat-icon">⏳</span><div class="stat-label">Active Trials</div><div class="stat-val" id="s-trial">—</div><div class="stat-sub" id="s-trial-sub">loading...</div></div>
+      <div class="stat-card c4"><span class="stat-icon">🔑</span><div class="stat-label">License Keys</div><div class="stat-val" id="s-keys">—</div><div class="stat-sub" id="s-keys-sub">loading...</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Plan Distribution</span></div>
+        <div style="padding:20px">
+          <div class="plan-chart" id="planChart"></div>
+          <div class="plan-labels" id="planLabels"></div>
+          <div style="margin-top:16px" id="planRows"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">⚡ Quick Actions</span></div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:10px;">
+          <button class="btn btn-primary" onclick="nav('licenses')" style="text-align:left;padding:12px 16px;">🔑 Create New License Key</button>
+          <button class="btn btn-ghost" onclick="nav('expiring')" style="text-align:left;padding:12px 16px;">⏰ View Expiring Accounts</button>
+          <button class="btn btn-ghost" onclick="nav('users')" style="text-align:left;padding:12px 16px;">👥 Manage All Users</button>
+          <button class="btn btn-ghost" onclick="refreshAll()" style="text-align:left;padding:12px 16px;">🔄 Refresh Data</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <div class="card-header"><span class="card-title">📋 Recent Signups</span></div>
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Plan</th><th>Joined</th></tr></thead>
+        <tbody id="recentUsers"><tr><td colspan="4"><div class="skel" style="width:80%"></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── USERS ── -->
+  <div class="page" id="page-users">
+    <div class="page-header">
+      <h2>User Management</h2>
+      <p>// view, search, block and manage all users</p>
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <input class="search-box" id="userSearch" placeholder="Search by name or email..." oninput="filterUsers()"/>
+        <select class="filter-sel" id="userFilter" onchange="filterUsers()">
+          <option value="">All Plans</option>
+          <option value="trial">Trial</option>
+          <option value="monthly">Monthly</option>
+          <option value="yearly">Yearly</option>
+          <option value="lifetime">Lifetime</option>
+        </select>
+        <button class="btn btn-ghost" onclick="loadUsers()">↻ Refresh</button>
+      </div>
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Plan</th><th>Trial / Expiry</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="usersTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── LICENSES ── -->
+  <div class="page" id="page-licenses">
+    <div class="page-header">
+      <h2>License Keys</h2>
+      <p>// create and manage license keys for customers</p>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">➕ Generate New License Key</span></div>
+      <div class="lic-form">
+        <div class="form-row">
+          <div class="fg"><label>Plan Type</label>
+            <select id="licPlan">
+              <option value="monthly">Monthly (30 days)</option>
+              <option value="yearly">Yearly (365 days)</option>
+              <option value="lifetime">Lifetime</option>
+            </select>
+          </div>
+          <div class="fg"><label>Customer Note (optional)</label><input type="text" id="licNote" placeholder="e.g. WhatsApp order #123"/></div>
+          <div class="fg"><label>Custom Key (optional)</label><input type="text" id="licCustom" placeholder="Auto-generated if empty"/></div>
+          <button class="btn btn-primary" onclick="createLicense()" style="height:38px;white-space:nowrap">⚡ Generate</button>
+        </div>
+        <div id="newKeyDisplay" style="display:none;margin-top:16px;padding:14px;background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.2);border-radius:8px;">
+          <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:6px;">NEW LICENSE KEY — SEND TO CUSTOMER:</div>
+          <div id="newKeyVal" style="font-family:var(--mono);font-size:18px;color:var(--accent);font-weight:700;letter-spacing:2px;"></div>
+          <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="copyKey()">📋 Copy Key</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <input class="search-box" id="licSearch" placeholder="Search keys..." oninput="filterLicenses()"/>
+        <select class="filter-sel" id="licFilter" onchange="filterLicenses()">
+          <option value="">All</option>
+          <option value="false">Unused</option>
+          <option value="true">Used</option>
+        </select>
+        <button class="btn btn-ghost" onclick="loadLicenses()">↻ Refresh</button>
+      </div>
+      <table>
+        <thead><tr><th>Key</th><th>Plan</th><th>Status</th><th>Used By</th><th>Created</th><th>Actions</th></tr></thead>
+        <tbody id="licTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── EXPIRING ── -->
+  <div class="page" id="page-expiring">
+    <div class="page-header">
+      <h2>Expiring Accounts</h2>
+      <p>// trials ending soon + paid plans about to expire</p>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">⏰ Trials Ending in 3 Days</span>
+        <span id="expTrialCount" style="font-family:var(--mono);font-size:12px;color:var(--warn)"></span>
+      </div>
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Trial Ends</th><th>Hours Left</th><th>Action</th></tr></thead>
+        <tbody id="expTrialTable"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">💳 Paid Plans Expiring in 7 Days</span>
+        <span id="expPaidCount" style="font-family:var(--mono);font-size:12px;color:var(--accent3)"></span>
+      </div>
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Plan</th><th>Expires</th><th>Days Left</th><th>Action</th></tr></thead>
+        <tbody id="expPaidTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── ACTIVITY ── -->
+  <div class="page" id="page-activity">
+    <div class="page-header">
+      <h2>Activity Log</h2>
+      <p>// recent signups, upgrades and expirations</p>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Recent Events</span><span style="font-size:11px;font-family:var(--mono);color:var(--muted)">last 30 users</span></div>
+      <div id="activityList"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Confirm modal -->
+<div class="modal-bg" id="confirmModal">
+  <div class="modal-box">
+    <h3 id="modalTitle">Confirm Action</h3>
+    <p id="modalBody">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" id="modalConfirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+// ── CONFIG ──
+var FIREBASE_CONFIG = {
+  apiKey:"AIzaSyAnZVNM5Mov6fRJ_yVhQE42X58xw_RPEUs",
+  authDomain:"gis-viewer-app.firebaseapp.com",
+  projectId:"gis-viewer-app",
+  storageBucket:"gis-viewer-app.firebasestorage.app",
+  messagingSenderId:"696344287586",
+  appId:"1:696344287586:web:97ac3942fd3d054d78743b"
+};
+
+// ── IMPORTANT: Set your admin email(s) here ──
+var ADMIN_EMAILS = ['pksharma122@gmail.com']; // ← add your email
+
+firebase.initializeApp(FIREBASE_CONFIG);
+var auth = firebase.auth();
+var db   = firebase.firestore();
+var PLAN_MS = {monthly:30*86400000, yearly:365*86400000, lifetime:36500*86400000};
+
+// ── State ──
+var allUsers = [], allLicenses = [];
+var currentModal = null;
+
+// ── Auth guard ──
+var _done = false;
+var _t = setTimeout(function(){ if(!_done) window.location.replace('login.html'); }, 8000);
+var _u = auth.onAuthStateChanged(function(user){
+  _done = true; clearTimeout(_t); _u();
+  if(!user){ window.location.replace('login.html'); return; }
+  if(!ADMIN_EMAILS.includes(user.email)){
+    alert('Access denied. Admin only.');
+    auth.signOut().then(function(){ window.location.replace('login.html'); });
+    return;
+  }
+  document.getElementById('adminEmail').textContent = user.email;
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('sidebar').style.display = 'flex';
+  document.getElementById('main').style.display = 'block';
+  refreshAll();
+});
+
+// ── Navigation ──
+function nav(page){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
+  document.getElementById('page-'+page).classList.add('active');
+  document.getElementById('nav-'+page).classList.add('active');
+  if(page==='users')    loadUsers();
+  if(page==='licenses') loadLicenses();
+  if(page==='expiring') loadExpiring();
+  if(page==='activity') loadActivity();
+}
+
+// ── Refresh all ──
+function refreshAll(){
+  loadOverview();
+}
+
+// ─────────────────────────────────────
+// OVERVIEW
+// ─────────────────────────────────────
+function loadOverview(){
+  db.collection('users').get().then(function(snap){
+    var users = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+    allUsers = users;
+    var now = Date.now();
+    var total = users.length;
+    var paid  = users.filter(function(u){ return ['monthly','yearly','lifetime'].includes(u.plan); }).length;
+    var trial = users.filter(function(u){ return u.plan==='trial' && (u.trialEnd||0)>now; }).length;
+    var exp   = users.filter(function(u){ return u.plan==='trial' && (u.trialEnd||0)<=now; }).length;
+
+    document.getElementById('s-total').textContent = total;
+    document.getElementById('s-trial').textContent = trial;
+    document.getElementById('s-paid').textContent  = paid;
+    document.getElementById('s-total-sub').textContent = exp+' expired trials';
+    document.getElementById('s-trial-sub').textContent = 'active free users';
+    document.getElementById('s-paid-sub').textContent  = 'paying customers';
+
+    // Plan chart
+    var counts = {trial:0,monthly:0,yearly:0,lifetime:0};
+    users.forEach(function(u){ if(counts[u.plan]!==undefined) counts[u.plan]++; });
+    var colors = {trial:'#ffd600',monthly:'#00e5ff',yearly:'#69ff47',lifetime:'#ff6b35'};
+    var chart='', labels='', rows='';
+    Object.keys(counts).forEach(function(k){
+      var pct = total>0 ? Math.round(counts[k]/total*100) : 0;
+      chart += '<div class="plan-seg" style="width:'+pct+'%;background:'+colors[k]+';" title="'+k+'"></div>';
+      labels += '<div class="plan-label"><div class="plan-dot" style="background:'+colors[k]+'"></div>'+k+'</div>';
+      rows += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;"><span style="font-size:12px;font-family:var(--mono)">'+k+'</span><span style="font-family:var(--mono);font-size:12px;color:var(--muted)">'+counts[k]+' ('+pct+'%)</span></div><div class="mini-bar"><div class="mini-bar-fill" style="width:'+pct+'%;background:'+colors[k]+'"></div></div>';
+    });
+    document.getElementById('planChart').innerHTML  = chart;
+    document.getElementById('planLabels').innerHTML = labels;
+    document.getElementById('planRows').innerHTML   = rows;
+
+    // Recent users
+    var sorted = users.slice().sort(function(a,b){ return (b.createdAt&&b.createdAt.toMillis?b.createdAt.toMillis():0)-(a.createdAt&&a.createdAt.toMillis?a.createdAt.toMillis():0); });
+    var html = sorted.slice(0,8).map(function(u){
+      return '<tr><td>'+esc(u.name||'—')+'</td><td style="font-family:var(--mono);font-size:12px">'+esc(u.email||'—')+'</td><td>'+planBadge(u.plan)+'</td><td style="font-family:var(--mono);font-size:11px;color:var(--muted)">'+fmtDate(u.createdAt)+'</td></tr>';
+    }).join('');
+    document.getElementById('recentUsers').innerHTML = html || '<tr><td colspan="4" class="empty">No users yet</td></tr>';
+  }).catch(function(e){ toast('Error loading users: '+e.message,'err'); });
+
+  // License count
+  db.collection('licenses').get().then(function(snap){
+    var keys = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+    allLicenses = keys;
+    var used = keys.filter(function(k){ return k.used; }).length;
+    document.getElementById('s-keys').textContent   = keys.length;
+    document.getElementById('s-keys-sub').textContent = used+' used, '+(keys.length-used)+' available';
+  });
+}
+
+// ─────────────────────────────────────
+// USERS
+// ─────────────────────────────────────
+function loadUsers(){
+  document.getElementById('usersTable').innerHTML = '<tr><td colspan="7" class="empty"><div class="skel" style="width:60%;margin:auto"></div></td></tr>';
+  db.collection('users').get().then(function(snap){
+    allUsers = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+    renderUsers(allUsers);
+  }).catch(function(e){ toast('Error: '+e.message,'err'); });
+}
+
+function renderUsers(users){
+  var now = Date.now();
+  if(!users.length){ document.getElementById('usersTable').innerHTML='<tr><td colspan="7"><div class="empty"><div class="ico">👥</div>No users found</div></td></tr>'; return; }
+  var html = users.map(function(u){
+    var expiry = u.plan==='trial' ? u.trialEnd : u.licenseExpiry;
+    var expired = u.plan!=='lifetime' && expiry && expiry < now;
+    var expStr = expiry ? (expired ? '<span style="color:var(--red)">Expired '+fmtDate2(expiry)+'</span>' : fmtDate2(expiry)) : '—';
+    var rowClass = expired ? 'expired-row' : (expiry && expiry-now < 3*86400000 ? 'expiring-soon' : '');
+    return '<tr class="'+rowClass+'"><td><b>'+esc(u.name||'—')+'</b></td><td style="font-family:var(--mono);font-size:12px">'+esc(u.email||'—')+'</td><td>'+planBadge(u.plan)+'</td><td style="font-size:12px;font-family:var(--mono)">'+expStr+'</td><td style="font-size:11px;font-family:var(--mono);color:var(--muted)">'+fmtDate(u.createdAt)+'</td><td>'+(u.blocked?'<span class="badge badge-blocked">BLOCKED</span>':'<span style="color:var(--accent2);font-size:11px;font-family:var(--mono)">● ACTIVE</span>')+'</td><td><div class="btn-group">'+(u.blocked?'<button class="btn btn-sm btn-success" onclick="unblockUser(\''+u.id+'\')">Unblock</button>':'<button class="btn btn-sm btn-warn" onclick="blockUser(\''+u.id+'\',\''+esc(u.email||'')+'\')">Block</button>')+'<button class="btn btn-sm btn-danger" onclick="deleteUser(\''+u.id+'\',\''+esc(u.email||'')+'\')">Delete</button></div></td></tr>';
+  }).join('');
+  document.getElementById('usersTable').innerHTML = html;
+}
+
+function filterUsers(){
+  var q = document.getElementById('userSearch').value.toLowerCase();
+  var f = document.getElementById('userFilter').value;
+  var filtered = allUsers.filter(function(u){
+    var match = !q || (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q);
+    var planMatch = !f || u.plan===f;
+    return match && planMatch;
+  });
+  renderUsers(filtered);
+}
+
+function blockUser(uid, email){
+  confirm2('Block User', 'Block '+email+'? They will lose access immediately.', function(){
+    db.collection('users').doc(uid).update({blocked:true})
+      .then(function(){ toast('User blocked','ok'); loadUsers(); })
+      .catch(function(e){ toast('Error: '+e.message,'err'); });
+  });
+}
+
+function unblockUser(uid){
+  db.collection('users').doc(uid).update({blocked:false})
+    .then(function(){ toast('User unblocked','ok'); loadUsers(); })
+    .catch(function(e){ toast('Error: '+e.message,'err'); });
+}
+
+function deleteUser(uid, email){
+  confirm2('Delete User', 'Permanently delete '+email+'? This cannot be undone.', function(){
+    db.collection('users').doc(uid).delete()
+      .then(function(){ toast('User deleted','ok'); loadUsers(); loadOverview(); })
+      .catch(function(e){ toast('Error: '+e.message,'err'); });
+  });
+}
+
+// ─────────────────────────────────────
+// LICENSES
+// ─────────────────────────────────────
+function loadLicenses(){
+  document.getElementById('licTable').innerHTML = '<tr><td colspan="6"><div class="skel" style="width:60%;margin:auto"></div></td></tr>';
+  db.collection('licenses').get().then(function(snap){
+    allLicenses = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); })
+                         .sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+    renderLicenses(allLicenses);
+  }).catch(function(e){ toast('Error: '+e.message,'err'); });
+}
+
+function renderLicenses(keys){
+  if(!keys.length){ document.getElementById('licTable').innerHTML='<tr><td colspan="6"><div class="empty"><div class="ico">🔑</div>No license keys yet</div></td></tr>'; return; }
+  var html = keys.map(function(k){
+    return '<tr><td class="key-cell" onclick="copyText(\''+k.id+'\')" title="Click to copy">'+k.id+'</td><td>'+planBadge(k.plan)+'</td><td>'+(k.used?'<span class="badge badge-expired">USED</span>':'<span style="color:var(--accent2);font-size:11px;font-family:var(--mono)">● AVAILABLE</span>')+'</td><td style="font-size:11px;font-family:var(--mono);color:var(--muted)">'+(k.usedBy||'—')+'</td><td style="font-size:11px;font-family:var(--mono);color:var(--muted)">'+fmtDate2Ts(k.createdAt)+'</td><td><button class="btn btn-sm btn-danger" onclick="deleteLicense(\''+k.id+'\')">Delete</button></td></tr>';
+  }).join('');
+  document.getElementById('licTable').innerHTML = html;
+}
+
+function filterLicenses(){
+  var q = document.getElementById('licSearch').value.toLowerCase();
+  var f = document.getElementById('licFilter').value;
+  var filtered = allLicenses.filter(function(k){
+    var match = !q || k.id.toLowerCase().includes(q);
+    var usedMatch = f==='' || String(k.used)===f;
+    return match && usedMatch;
+  });
+  renderLicenses(filtered);
+}
+
+function createLicense(){
+  var plan   = document.getElementById('licPlan').value;
+  var note   = document.getElementById('licNote').value.trim();
+  var custom = document.getElementById('licCustom').value.trim().toUpperCase().replace(/\s+/g,'-');
+  var key    = custom || genKey(plan);
+  db.collection('licenses').doc(key).set({
+    plan:plan, used:false, usedBy:null, usedAt:null,
+    note:note||null, expiry:null, createdAt:Date.now()
+  }).then(function(){
+    document.getElementById('newKeyVal').textContent = key;
+    document.getElementById('newKeyDisplay').style.display = 'block';
+    toast('License key created!','ok');
+    document.getElementById('licCustom').value = '';
+    document.getElementById('licNote').value   = '';
+    loadLicenses();
+  }).catch(function(e){ toast('Error: '+e.message,'err'); });
+}
+
+function genKey(plan){
+  var prefix = {monthly:'GIS-MO',yearly:'GIS-YR',lifetime:'GIS-LT'}[plan]||'GIS';
+  var rand = Math.random().toString(36).substring(2,7).toUpperCase();
+  var rand2= Math.random().toString(36).substring(2,6).toUpperCase();
+  return prefix+'-'+rand+'-'+rand2;
+}
+
+function copyKey(){
+  var key = document.getElementById('newKeyVal').textContent;
+  copyText(key);
+}
+
+function deleteLicense(id){
+  confirm2('Delete License', 'Delete key '+id+'?', function(){
+    db.collection('licenses').doc(id).delete()
+      .then(function(){ toast('Key deleted','ok'); loadLicenses(); })
+      .catch(function(e){ toast('Error: '+e.message,'err'); });
+  });
+}
+
+// ─────────────────────────────────────
+// EXPIRING
+// ─────────────────────────────────────
+function loadExpiring(){
+  db.collection('users').get().then(function(snap){
+    var now = Date.now();
+    var users = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+
+    // Trials ending in 3 days
+    var exp3 = users.filter(function(u){
+      return u.plan==='trial' && u.trialEnd && u.trialEnd>now && u.trialEnd-now < 3*86400000;
+    }).sort(function(a,b){ return a.trialEnd-b.trialEnd; });
+
+    document.getElementById('expTrialCount').textContent = exp3.length+' users';
+    if(!exp3.length){
+      document.getElementById('expTrialTable').innerHTML = '<tr><td colspan="5"><div class="empty"><div class="ico">✅</div>No trials expiring soon</div></td></tr>';
+    } else {
+      document.getElementById('expTrialTable').innerHTML = exp3.map(function(u){
+        var ms=u.trialEnd-now, hrs=Math.floor(ms/3600000);
+        return '<tr class="expiring-soon"><td>'+esc(u.name||'—')+'</td><td style="font-family:var(--mono);font-size:12px">'+esc(u.email)+'</td><td>'+fmtDate2(u.trialEnd)+'</td><td><span style="color:var(--warn);font-family:var(--mono);font-size:13px;font-weight:700">'+hrs+'h</span></td><td><button class="btn btn-sm btn-success" onclick="extendTrial(\''+u.id+'\')">+3 Days</button></td></tr>';
+      }).join('');
+    }
+
+    // Paid expiring in 7 days
+    var exp7 = users.filter(function(u){
+      return ['monthly','yearly'].includes(u.plan) && u.licenseExpiry && u.licenseExpiry>now && u.licenseExpiry-now < 7*86400000;
+    }).sort(function(a,b){ return a.licenseExpiry-b.licenseExpiry; });
+
+    document.getElementById('expPaidCount').textContent = exp7.length+' accounts';
+    if(!exp7.length){
+      document.getElementById('expPaidTable').innerHTML = '<tr><td colspan="6"><div class="empty"><div class="ico">✅</div>No paid plans expiring soon</div></td></tr>';
+    } else {
+      document.getElementById('expPaidTable').innerHTML = exp7.map(function(u){
+        var ms=u.licenseExpiry-now, days=Math.ceil(ms/86400000);
+        return '<tr class="expiring-soon"><td>'+esc(u.name||'—')+'</td><td style="font-family:var(--mono);font-size:12px">'+esc(u.email)+'</td><td>'+planBadge(u.plan)+'</td><td>'+fmtDate2(u.licenseExpiry)+'</td><td><span style="color:var(--accent3);font-family:var(--mono);font-weight:700">'+days+'d</span></td><td><button class="btn btn-sm btn-primary" onclick="nav(\'licenses\')">Send Key</button></td></tr>';
+      }).join('');
+    }
+  });
+}
+
+function extendTrial(uid){
+  var ext = 3*86400000;
+  db.collection('users').doc(uid).get().then(function(snap){
+    var newEnd = Math.max(snap.data().trialEnd||Date.now(), Date.now()) + ext;
+    return db.collection('users').doc(uid).update({trialEnd:newEnd});
+  }).then(function(){ toast('Trial extended by 3 days','ok'); loadExpiring(); })
+    .catch(function(e){ toast('Error: '+e.message,'err'); });
+}
+
+// ─────────────────────────────────────
+// ACTIVITY
+// ─────────────────────────────────────
+function loadActivity(){
+  db.collection('users').get().then(function(snap){
+    var now = Date.now();
+    var events = [];
+    snap.docs.forEach(function(d){
+      var u = Object.assign({id:d.id},d.data());
+      var ts = u.createdAt && u.createdAt.toMillis ? u.createdAt.toMillis() : (u.createdAt||0);
+      events.push({type:'signup',ts:ts,name:u.name,email:u.email,plan:u.plan});
+      if(['monthly','yearly','lifetime'].includes(u.plan) && u.licenseExpiry){
+        events.push({type:'upgrade',ts:u.licenseExpiry-(PLAN_MS[u.plan]||0),name:u.name,email:u.email,plan:u.plan});
+      }
+      if(u.plan==='trial' && u.trialEnd && u.trialEnd < now){
+        events.push({type:'expired',ts:u.trialEnd,name:u.name,email:u.email,plan:'trial'});
+      }
+    });
+    events.sort(function(a,b){ return b.ts-a.ts; });
+    var icons = {signup:'signup',upgrade:'upgrade',expired:'expired'};
+    var labels = {signup:'Signed up',upgrade:'Upgraded to',expired:'Trial expired'};
+    var html = events.slice(0,40).map(function(ev){
+      return '<div class="activity-item"><div class="activity-dot '+icons[ev.type]+'"></div><div style="flex:1"><div style="font-size:13px"><b>'+esc(ev.name||'—')+'</b> <span style="color:var(--muted)">'+labels[ev.type]+'</span> '+(ev.type==='upgrade'?planBadge(ev.plan):'')+'</div><div style="font-size:11px;color:var(--muted);font-family:var(--mono)">'+esc(ev.email||'')+'</div><div class="activity-time">'+fmtAgo(ev.ts)+'</div></div></div>';
+    }).join('') || '<div class="empty"><div class="ico">📋</div>No activity yet</div>';
+    document.getElementById('activityList').innerHTML = html;
+  });
+}
+
+// ── Helpers ──
+function planBadge(plan){
+  var cls={trial:'badge-trial',monthly:'badge-monthly',yearly:'badge-yearly',lifetime:'badge-lifetime'}[plan]||'badge-trial';
+  return '<span class="badge '+cls+'">'+(plan||'trial').toUpperCase()+'</span>';
+}
+function fmtDate(ts){ if(!ts) return '—'; var d=ts.toDate?ts.toDate():new Date(ts); return d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}); }
+function fmtDate2(ms){ if(!ms) return '—'; return new Date(ms).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}); }
+function fmtDate2Ts(ts){ if(!ts) return '—'; return fmtDate2(ts); }
+function fmtAgo(ms){ if(!ms) return '—'; var s=Math.floor((Date.now()-ms)/1000); if(s<60) return s+'s ago'; if(s<3600) return Math.floor(s/60)+'m ago'; if(s<86400) return Math.floor(s/3600)+'h ago'; return Math.floor(s/86400)+'d ago'; }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function copyText(t){ navigator.clipboard.writeText(t).then(function(){ toast('Copied: '+t,'ok'); }); }
+function doLogout(){ auth.signOut().then(function(){ window.location.replace('login.html'); }); }
+
+// ── Confirm modal ──
+function confirm2(title, body, cb){
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').textContent  = body;
+  document.getElementById('modalConfirm').onclick = function(){ closeModal(); cb(); };
+  document.getElementById('confirmModal').classList.add('show');
+}
+function closeModal(){ document.getElementById('confirmModal').classList.remove('show'); }
+
+// ── Toast ──
+function toast(msg, type){
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show '+(type||'ok');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(function(){ el.className=''; }, 3000);
+}
+</script>
+</body>
+</html>
